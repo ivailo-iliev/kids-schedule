@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Моят Ден</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; background:oklch(0.92 0.025 55); font-family:'Nunito',sans-serif; overflow:hidden; }
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image: linear-gradient(var(--grid-line, oklch(0.88 0.03 55 / 0.35)) 1px, transparent 1px),
+                        linear-gradient(90deg, var(--grid-line, oklch(0.88 0.03 55 / 0.35)) 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+    #root { height:100%; display:flex; justify-content:center; align-items:flex-start;
+            overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; z-index:1; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "ice",
+  "debugEvent": "6:30 🌅",
+  "debugTimer": "авто"
+}/*EDITMODE-END*/;
+
+/* ── Schedule data ── */
+const ICE_LIST  = [{ emoji:'⛸️', label:'Кънки' }, { emoji:'🪢', label:'Ластик' }, { emoji:'💧', label:'Вода' }];
+const SUHA_LIST = [{ emoji:'🎒', label:'Чанта' }, { emoji:'🌀', label:'Постелка' }, { emoji:'💧', label:'Вода' }];
+
+const DEFAULT_SCHEDULE = [
+  { time: '6:30',  name: 'Добро утро',     emoji: '🌅', location: null,
+    pageBg:'oklch(0.96 0.04 62)',  cardFrom:'oklch(0.93 0.07 60)',  cardTo:'oklch(0.98 0.02 75)',
+    checklist: [{ emoji:'🪥', label:'Зъби' }, { emoji:'👕', label:'Дрехи' }, { emoji:'🪮', label:'Коса' }, { emoji:'👟', label:'Обуване' }] },
+  { time: '7:30',  name: 'Лед с Албена',   emoji: '⛸️', location: 'Ледена пързалка',
+    pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
+    checklist: ICE_LIST },
+  { time: '8:45',  name: 'Закуска',         emoji: '🥐', location: null,
+    pageBg:'oklch(0.97 0.03 78)',  cardFrom:'oklch(0.94 0.06 75)',  cardTo:'oklch(0.99 0.01 88)',
+    checklist: [] },
+  { time: '10:30', name: 'Лед със Стоян',  emoji: '⛸️', location: 'Ледена пързалка',
+    pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
+    checklist: ICE_LIST },
+  { time: '11:45', name: 'Суха със Стоян', emoji: '💪', location: null,
+    pageBg:'oklch(0.95 0.04 50)',  cardFrom:'oklch(0.91 0.08 47)',  cardTo:'oklch(0.97 0.02 60)',
+    checklist: SUHA_LIST },
+  { time: '13:00', name: 'Обяд',            emoji: '🍝', location: null,
+    pageBg:'oklch(0.96 0.04 44)',  cardFrom:'oklch(0.92 0.08 42)',  cardTo:'oklch(0.98 0.02 55)',
+    checklist: [] },
+  { time: '15:00', name: 'Лед с Андрей',   emoji: '⛸️', location: 'Ледена пързалка',
+    pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
+    checklist: ICE_LIST },
+  { time: '16:30', name: 'Следобедна закуска', emoji: '🍎', location: null,
+    pageBg:'oklch(0.95 0.05 68)',  cardFrom:'oklch(0.91 0.09 65)',  cardTo:'oklch(0.97 0.03 78)',
+    checklist: [] },
+  { time: '17:00', name: 'Суха със Стоян', emoji: '💪', location: null,
+    pageBg:'oklch(0.95 0.04 50)',  cardFrom:'oklch(0.91 0.08 47)',  cardTo:'oklch(0.97 0.02 60)',
+    checklist: SUHA_LIST },
+  { time: '19:30', name: 'Вечеря',          emoji: '🥗', location: null,
+    pageBg:'oklch(0.95 0.04 148)', cardFrom:'oklch(0.91 0.08 145)', cardTo:'oklch(0.97 0.02 155)',
+    checklist: [] },
+  { time: '21:00', name: 'Лека нощ',        emoji: '🌙', location: null,
+    pageBg:'oklch(0.16 0.06 278)', cardFrom:'oklch(0.20 0.09 280)', cardTo:'oklch(0.28 0.07 270)',
+    dark: true,
+    checklist: [{ emoji:'🪥', label:'Зъби' }, { emoji:'🚿', label:'Душ' }, { emoji:'🪮', label:'Коса' }, { emoji:'👕', label:'Пижама' }] },
+];
+
+/* ── Themes (accent color only) ── */
+const THEMES = {
+  ice:    { accent:'oklch(0.50 0.18 350)' },
+  aurora: { accent:'oklch(0.48 0.15 250)' },
+  sunset: { accent:'oklch(0.45 0.16 295)' },
+};
+
+const TEMPLATE_BY_KIND = {
+  morning: {
+    emoji: '🌅',
+    name: 'Добро утро',
+    location: null,
+    pageBg:'oklch(0.96 0.04 62)',
+    cardFrom:'oklch(0.93 0.07 60)',
+    cardTo:'oklch(0.98 0.02 75)',
+    checklist: [{ emoji:'🪥', label:'Зъби' }, { emoji:'👕', label:'Дрехи' }, { emoji:'🪮', label:'Коса' }, { emoji:'👟', label:'Обуване' }],
+  },
+  ice: {
+    emoji: '⛸️',
+    name: 'Лед',
+    location: 'Ледена пързалка',
+    pageBg:'oklch(0.93 0.04 238)',
+    cardFrom:'oklch(0.89 0.07 240)',
+    cardTo:'oklch(0.96 0.03 228)',
+    checklist: ICE_LIST,
+  },
+  breakfast: {
+    emoji: '🥐',
+    name: 'Закуска',
+    location: null,
+    pageBg:'oklch(0.97 0.03 78)',
+    cardFrom:'oklch(0.94 0.06 75)',
+    cardTo:'oklch(0.99 0.01 88)',
+    checklist: [],
+  },
+  dry: {
+    emoji: '💪',
+    name: 'Суха',
+    location: null,
+    pageBg:'oklch(0.95 0.04 50)',
+    cardFrom:'oklch(0.91 0.08 47)',
+    cardTo:'oklch(0.97 0.02 60)',
+    checklist: SUHA_LIST,
+  },
+  lunch: {
+    emoji: '🍝',
+    name: 'Обяд',
+    location: null,
+    pageBg:'oklch(0.96 0.04 44)',
+    cardFrom:'oklch(0.92 0.08 42)',
+    cardTo:'oklch(0.98 0.02 55)',
+    checklist: [],
+  },
+  snack: {
+    emoji: '🍎',
+    name: 'Следобедна закуска',
+    location: null,
+    pageBg:'oklch(0.95 0.05 68)',
+    cardFrom:'oklch(0.91 0.09 65)',
+    cardTo:'oklch(0.97 0.03 78)',
+    checklist: [],
+  },
+  dinner: {
+    emoji: '🥗',
+    name: 'Вечеря',
+    location: null,
+    pageBg:'oklch(0.95 0.04 148)',
+    cardFrom:'oklch(0.91 0.08 145)',
+    cardTo:'oklch(0.97 0.02 155)',
+    checklist: [],
+  },
+  bedtime: {
+    emoji: '🌙',
+    name: 'Лека нощ',
+    location: null,
+    pageBg:'oklch(0.16 0.06 278)',
+    cardFrom:'oklch(0.20 0.09 280)',
+    cardTo:'oklch(0.28 0.07 270)',
+    dark: true,
+    checklist: [{ emoji:'🪥', label:'Зъби' }, { emoji:'🚿', label:'Душ' }, { emoji:'🪮', label:'Коса' }, { emoji:'👕', label:'Пижама' }],
+  },
+  default: {
+    emoji: '🗓️',
+    name: 'Събитие',
+    location: null,
+    pageBg:'oklch(0.95 0.03 258)',
+    cardFrom:'oklch(0.92 0.05 258)',
+    cardTo:'oklch(0.98 0.02 258)',
+    checklist: [],
+  },
+};
+
+/* ── Helpers ── */
+const pad = n => String(Math.abs(n)).padStart(2,'0');
+const BG_DAYS = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
+
+const CALENDAR_ENDPOINT = '/api/google-calendar';
+
+function cloneChecklist(items = []) {
+  return items.map(item => ({ ...item }));
+}
+
+function cloneSchedule(schedule) {
+  return schedule.map(ev => ({ ...ev, checklist: cloneChecklist(ev.checklist || []) }));
+}
+
+function toSec(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 3600 + m * 60;
+}
+function nowSec(now) {
+  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+}
+
+function formatTimeInZone(date, timeZone) {
+  return new Intl.DateTimeFormat('bg-BG', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
+function normalizeText(value = '') {
+  return String(value).toLowerCase();
+}
+
+function inferKind(summary = '', description = '', location = '') {
+  const text = `${summary} ${description} ${location}`.toLowerCase();
+  if (text.includes('лека нощ') || text.includes('good night') || text.includes('bedtime')) return 'bedtime';
+  if (text.includes('добро утро') || text.includes('good morning') || text.includes('morning')) return 'morning';
+  if (text.includes('следобедна') || text.includes('afternoon snack')) return 'snack';
+  if (text.includes('обяд') || text.includes('lunch')) return 'lunch';
+  if (text.includes('вечеря') || text.includes('dinner')) return 'dinner';
+  if (text.includes('закуска') || text.includes('breakfast')) return 'breakfast';
+  if (text.includes('суха') || text.includes('dry') || text.includes('gym') || text.includes('strength')) return 'dry';
+  if (text.includes('лед') || text.includes('ice') || text.includes('skate') || text.includes('⛸')) return 'ice';
+  return 'default';
+}
+
+function styleFromEvent(event) {
+  const kind = inferKind(event.summary, event.description, event.location);
+  const template = TEMPLATE_BY_KIND[kind] || TEMPLATE_BY_KIND.default;
+  return {
+    kind,
+    emoji: template.emoji,
+    name: event.summary?.trim() || template.name,
+    location: event.location ?? template.location,
+    pageBg: template.pageBg,
+    cardFrom: template.cardFrom,
+    cardTo: template.cardTo,
+    dark: !!template.dark,
+    checklist: cloneChecklist(template.checklist),
+  };
+}
+
+function calendarEventsToSchedule(events, timeZone) {
+  return (events || [])
+    .filter(ev => ev && ev.start?.dateTime)
+    .map(ev => {
+      const startDate = new Date(ev.start.dateTime);
+      const styled = styleFromEvent(ev);
+      return {
+        time: formatTimeInZone(startDate, timeZone),
+        ...styled,
+      };
+    })
+    .sort((a, b) => toSec(a.time) - toSec(b.time));
+}
+
+function getScheduleTemplateFallback() {
+  return cloneSchedule(DEFAULT_SCHEDULE);
+}
+
+/* Returns index of current active (or next upcoming) event.
+   Accounts for: natural time, half-time auto-advance, manual completions. */
+function findHeroIdx(now, completed, schedule) {
+  const ns = nowSec(now);
+
+  // Last event that has started (or 0 if none yet)
+  let candidate = 0;
+  for (let i = 0; i < schedule.length; i++) {
+    if (toSec(schedule[i].time) <= ns) candidate = i;
+  }
+
+  // Half-time auto-advance: if past the midpoint between this and next event, skip ahead
+  if (candidate < schedule.length - 1) {
+    const start = toSec(schedule[candidate].time);
+    const end   = toSec(schedule[candidate + 1].time);
+    if (ns >= start + (end - start) / 2) {
+      candidate = candidate + 1;
+    }
+  }
+
+  // Skip manually completed events
+  while (candidate < schedule.length - 1 && completed.has(candidate)) {
+    candidate++;
+  }
+
+  return candidate;
+}
+
+/* Returns diff in seconds: positive = upcoming, negative = elapsed since start */
+function countdownDiff(now, idx, schedule) {
+  return toSec(schedule[idx].time) - nowSec(now);
+}
+
+function formatDiff(diff) {
+  const abs = Math.abs(Math.round(diff));
+  const min = Math.floor(abs / 60);
+  const sec = abs % 60;
+  const sign = diff < 0 ? '−' : '';
+  return `${sign}${pad(min)}:${pad(sec)}`;
+}
+
+/* ── useNow hook ── */
+function useNow() {
+  const [now, setNow] = React.useState(new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+/* ── StatusBar ── */
+function StatusBar({ now, dark }) {
+  const col = dark ? 'oklch(0.62 0.06 280)' : 'oklch(0.42 0.06 258)';
+  const col2 = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.58 0.05 258)';
+  return (
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                  padding:'14px 24px 4px', userSelect:'none' }}>
+      <span style={{ fontSize:15, fontWeight:800, color:col, letterSpacing:'-0.3px' }}>
+        {pad(now.getHours())}:{pad(now.getMinutes())}
+      </span>
+      <span style={{ fontSize:13, fontWeight:700, color:col2 }}>
+        {BG_DAYS[now.getDay()]} · {now.getDate()}.{pad(now.getMonth()+1)}
+      </span>
+    </div>
+  );
+}
+
+/* ── CheckItem ── */
+function CheckItem({ emoji, label, checked, onToggle, dark }) {
+  const [pressing, setPressing] = React.useState(false);
+  const unchBg    = dark ? 'oklch(1 0 0 / 0.10)' : 'oklch(1 0 0 / 0.55)';
+  const chBg      = dark ? 'oklch(0.35 0.12 155 / 0.45)' : 'oklch(0.93 0.08 155)';
+  const unchBord  = dark ? '1.5px solid oklch(1 0 0 / 0.20)' : '1.5px solid oklch(0.85 0.03 260)';
+  const chBord    = dark ? '1.5px solid oklch(0.55 0.14 158 / 0.7)' : '1.5px solid oklch(0.65 0.14 158)';
+  const textCol   = dark ? (checked ? 'oklch(0.72 0.14 158)' : 'oklch(0.88 0.03 280)') : (checked ? 'oklch(0.45 0.12 158)' : 'oklch(0.3 0.07 260)');
+  return (
+    <button onClick={onToggle}
+      onPointerDown={() => setPressing(true)}
+      onPointerUp={() => setPressing(false)}
+      onPointerLeave={() => setPressing(false)}
+      style={{
+        background: checked ? chBg : unchBg,
+        border: checked ? chBord : unchBord,
+        borderRadius:16, padding:'12px 8px 10px',
+        display:'flex', flexDirection:'column', alignItems:'center', gap:5,
+        cursor:'pointer', fontFamily:'inherit', minHeight:82,
+        transform: pressing ? 'scale(0.92)' : 'scale(1)',
+        transition:'transform 0.12s, background 0.18s',
+      }}>
+      <span style={{ fontSize:26, lineHeight:1, opacity: checked ? 0.6 : 1 }}>{emoji}</span>
+      <span style={{ fontSize:11, fontWeight:800, color:textCol,
+        textDecoration: checked ? 'line-through' : 'none' }}>{label}</span>
+      <div style={{
+        width:18, height:18, borderRadius:'50%',
+        background: checked ? (dark ? 'oklch(0.55 0.14 158)' : 'oklch(0.65 0.14 158)') : 'transparent',
+        border: checked ? 'none' : `1.5px solid ${dark ? 'oklch(0.5 0.03 280)' : 'oklch(0.75 0.03 260)'}`,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:10, color:'white', fontWeight:900, transition:'all 0.18s',
+      }}>{checked ? '✓' : ''}</div>
+    </button>
+  );
+}
+
+/* ── HeroCard ── */
+function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTimer, schedule }) {
+  const ev      = schedule[heroIdx];
+  const diff    = countdownDiff(now, heroIdx, schedule);
+  // debugTimer override: 'обратно' = force upcoming, 'изминало' = force started
+  const effectiveDiff = debugTimer === 'обратно' && diff < 0 ? 60
+    : debugTimer === 'изминало' && diff >= 0 ? -60
+    : diff;
+  const started = effectiveDiff < 0;
+  const accent  = (THEMES[theme] || THEMES.ice).accent;
+  const isLast  = heroIdx === schedule.length - 1;
+  const dark    = !!ev.dark;
+
+  const absSec  = Math.abs(Math.round(effectiveDiff));
+  const min     = Math.floor(absSec / 60);
+  const sec     = absSec % 60;
+  const bigSize = min >= 100 ? 58 : 72;
+
+  /* color tokens that flip for dark card */
+  const titleCol   = dark ? 'oklch(0.95 0.04 282)' : 'oklch(0.18 0.07 260)';
+  const metaCol    = dark ? 'oklch(0.62 0.06 280)' : 'oklch(0.50 0.05 260)';
+  const timerBg    = dark ? 'oklch(1 0 0 / 0.07)' : 'oklch(0 0 0 / 0.05)';
+  const labelCol   = started
+    ? (dark ? 'oklch(0.78 0.18 30)' : 'oklch(0.62 0.20 25)')
+    : (dark ? 'oklch(0.62 0.06 280)' : 'oklch(0.50 0.06 260)');
+  const timerCol   = started
+    ? (dark ? 'oklch(0.78 0.18 30)' : 'oklch(0.62 0.20 25)')
+    : (dark ? 'oklch(0.92 0.05 282)' : 'oklch(0.25 0.12 258)');
+
+  return (
+    <div style={{
+      margin:'8px 16px 0', borderRadius:28, overflow:'hidden',
+      background:`linear-gradient(160deg, ${ev.cardFrom} 0%, ${ev.cardTo} 100%)`,
+      boxShadow:'0 8px 32px oklch(0.4 0.06 260 / 0.10)',
+      position:'relative',
+    }}>
+      {/* faded emoji bg */}
+      <div style={{
+        position:'absolute', top:-10, right:10, fontSize:130, lineHeight:1,
+        opacity:0.08, pointerEvents:'none', userSelect:'none', filter:'blur(2px)',
+      }}>{ev.emoji}</div>
+
+      <div style={{ padding:'24px 22px 20px', position:'relative' }}>
+
+        {/* ① Event identity — left aligned */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18 }}>
+          <span style={{ fontSize:50, lineHeight:1, flexShrink:0 }}>{ev.emoji}</span>
+          <div>
+            <div style={{ fontSize:22, fontWeight:900, letterSpacing:'-0.5px',
+                          lineHeight:1.1, color:titleCol, marginBottom:3 }}>{ev.name}</div>
+            <div style={{ fontSize:12, fontWeight:700, color:metaCol }}>
+              {ev.location ? `${ev.time} · ${ev.location}` : ev.time}
+            </div>
+          </div>
+        </div>
+
+        {/* ② Timer zone — centred pill */}
+        <div style={{
+          background: timerBg, borderRadius:20, textAlign:'center',
+          padding:'14px 20px 12px', marginBottom:16,
+        }}>
+          <div style={{
+            fontSize:11, fontWeight:800, letterSpacing:2.5,
+            textTransform:'uppercase', color:labelCol, marginBottom:6,
+          }}>
+            {started ? 'Започна преди' : 'След'}
+          </div>
+          <div style={{ display:'flex', justifyContent:'center', alignItems:'baseline' }}>
+            {/* mirror spacer + sign keep digits centred */}
+            <span style={{ opacity: started ? 1 : 0, visibility: started ? 'visible' : 'hidden',
+              fontSize:bigSize, fontWeight:900, lineHeight:1, color:timerCol,
+              marginRight:1, letterSpacing:0 }}>−</span>
+            <span style={{ fontSize:bigSize, fontWeight:900, lineHeight:1,
+              letterSpacing:'-4px', fontVariantNumeric:'tabular-nums', color:timerCol,
+              transition:'color 0.4s' }}>{`${pad(min)}:${pad(sec)}`}</span>
+            <span style={{ visibility:'hidden',
+              fontSize:bigSize, fontWeight:900, lineHeight:1,
+              marginLeft:1, letterSpacing:0 }}>−</span>
+          </div>
+        </div>
+
+        {/* ③ Checklist */}
+        {checks.length > 0 && (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:8, marginBottom:12 }}>
+            {checks.map((item, i) => (
+              <CheckItem key={i} emoji={item.emoji} label={item.label}
+                         checked={item.checked} onToggle={() => onToggle(i)} dark={dark} />
+            ))}
+          </div>
+        )}
+
+        {/* ④ Готово */}
+        {!isLast && <DoneButton onComplete={onComplete} accent={accent} />}
+      </div>
+    </div>
+  );
+}
+
+function DoneButton({ onComplete, accent }) {
+  const [pressing, setPressing] = React.useState(false);
+  return (
+    <button
+      onClick={onComplete}
+      onPointerDown={() => setPressing(true)}
+      onPointerUp={() => setPressing(false)}
+      onPointerLeave={() => setPressing(false)}
+      style={{
+        width:'100%', marginTop:14, padding:'13px 16px',
+        background: accent, border:'none',
+        borderRadius:16, color:'white',
+        fontSize:15, fontWeight:800, letterSpacing:0.3,
+        cursor:'pointer', fontFamily:'inherit',
+        display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+        transform: pressing ? 'scale(0.97)' : 'scale(1)',
+        opacity: pressing ? 0.85 : 1,
+        transition:'transform 0.1s, opacity 0.1s',
+        boxShadow:`0 4px 14px oklch(0 0 0 / 0.12)`,
+      }}
+    >
+      <span>Готово</span>
+      <span style={{ fontSize:16 }}>✓</span>
+    </button>
+  );
+}
+
+/* ── EventList ── */
+function EventList({ now, heroIdx, dark, schedule }) {
+  const ns = nowSec(now);
+  const rowBg      = dark ? 'oklch(0.24 0.07 278)' : 'white';
+  const textNorm   = dark ? 'oklch(0.85 0.04 280)' : 'oklch(0.22 0.06 258)';
+  const textPast   = dark ? 'oklch(0.50 0.04 280)' : 'oklch(0.6 0.03 258)';
+  const timePast   = dark ? 'oklch(0.42 0.04 280)' : 'oklch(0.65 0.03 258)';
+  const timeNorm   = dark ? 'oklch(0.62 0.05 280)' : 'oklch(0.55 0.05 258)';
+  const borderCur  = dark ? '3px solid oklch(0.62 0.12 280)' : '3px solid oklch(0.55 0.16 350)';
+  const sectionCol = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.52 0.05 258)';
+  const pillBg     = dark ? 'oklch(0.32 0.09 278)' : 'oklch(0.94 0.06 350)';
+  const pillCol    = dark ? 'oklch(0.72 0.10 280)' : 'oklch(0.48 0.16 350)';
+
+  return (
+    <div style={{ padding:'16px 16px 0' }}>
+      <div style={{ fontSize:10, fontWeight:800, letterSpacing:2.5,
+                    textTransform:'uppercase', color:sectionCol,
+                    marginBottom:10, paddingLeft:4 }}>Днес</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+        {schedule.map((ev, i) => {
+          const isPast    = i < heroIdx;
+          const isCurrent = i === heroIdx;
+          return (
+            <div key={i} style={{
+              background: rowBg, borderRadius:14, padding:'11px 16px',
+              display:'flex', alignItems:'center', gap:12,
+              boxShadow: isCurrent
+                ? (dark ? '0 4px 18px oklch(0.1 0.06 278 / 0.5)' : '0 4px 18px oklch(0.4 0.06 258 / 0.14)')
+                : (dark ? 'none' : '0 2px 8px oklch(0.4 0.05 258 / 0.06)'),
+              opacity: isPast ? 0.38 : 1,
+              borderLeft: isCurrent ? borderCur : '3px solid transparent',
+              transition:'opacity 0.3s',
+            }}>
+              <span style={{ fontSize:13, fontWeight:800,
+                             color: isPast ? timePast : timeNorm,
+                             minWidth:42, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
+              <span style={{ fontSize:18, lineHeight:1 }}>{ev.emoji}</span>
+              <span style={{ fontSize:14, fontWeight:700, flex:1,
+                             color: isPast ? textPast : textNorm,
+                             textDecoration: isPast ? 'line-through' : 'none',
+                             textDecorationColor: dark ? 'oklch(0.4 0.04 280)' : 'oklch(0.7 0.03 258)' }}>{ev.name}</span>
+              {isCurrent && (
+                <span style={{ fontSize:9, fontWeight:800, letterSpacing:1.5, textTransform:'uppercase',
+                               color:pillCol, background:pillBg, padding:'3px 7px', borderRadius:8 }}>сега</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── App ── */
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const now = useNow();
+  const [schedule, setSchedule] = React.useState(() => getScheduleTemplateFallback());
+  /* Per-event checklist state, keyed by event index */
+  const [checkStates, setCheckStates] = React.useState({});
+
+  // Manual completions: set of event indices the child marked done
+  const [completed, setCompleted] = React.useState(new Set());
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadCalendarSchedule() {
+      try {
+        const response = await fetch(CALENDAR_ENDPOINT);
+        if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
+        const data = await response.json();
+        const timeZone = data.timeZone || 'Europe/Sofia';
+        const mapped = calendarEventsToSchedule(data.events || [], timeZone);
+        if (!cancelled && mapped.length > 0) {
+          setSchedule(mapped);
+        }
+      } catch (error) {
+        console.warn('Using bundled schedule because Google Calendar could not be loaded.', error);
+      }
+    }
+
+    loadCalendarSchedule();
+    return () => { cancelled = true; };
+  }, []);
+
+  React.useEffect(() => {
+    setCompleted(new Set());
+    setCheckStates({});
+  }, [schedule]);
+
+  // Debug overrides from Tweaks
+  const eventOpts = React.useMemo(() => ['авто', ...schedule.map(ev => `${ev.time} ${ev.emoji}`)], [schedule]);
+  const debugIdx = React.useMemo(() => (
+    t.debugEvent !== 'авто'
+      ? schedule.findIndex(ev => `${ev.time} ${ev.emoji}` === t.debugEvent)
+      : -1
+  ), [schedule, t.debugEvent]);
+
+  React.useEffect(() => {
+    if (t.debugEvent !== 'авто' && !eventOpts.includes(t.debugEvent)) {
+      setTweak('debugEvent', 'авто');
+    }
+  }, [eventOpts, t.debugEvent, setTweak]);
+
+  const heroIdx = debugIdx >= 0 ? debugIdx : findHeroIdx(now, completed, schedule);
+
+  const heroChecks = React.useMemo(() => {
+    const base = schedule[heroIdx].checklist.map(item => ({ ...item, checked: false }));
+    const saved = checkStates[heroIdx] || [];
+    return base.map((item, i) => ({ ...item, checked: saved[i] ?? false }));
+  }, [heroIdx, checkStates, schedule]);
+
+  const toggleCheck = React.useCallback(i => {
+    setCheckStates(prev => {
+      const current = (prev[heroIdx] || schedule[heroIdx].checklist.map(() => false));
+      const next = [...current];
+      next[i] = !next[i];
+      return { ...prev, [heroIdx]: next };
+    });
+  }, [heroIdx, schedule]);
+
+  const handleComplete = React.useCallback(() => {
+    setCompleted(prev => new Set([...prev, heroIdx]));
+  }, [heroIdx]);
+
+  /* Sync page + body bg and grid to current event */
+  React.useEffect(() => {
+    const ev = schedule[heroIdx];
+    document.body.style.background = ev.pageBg;
+    document.body.style.transition = 'background 0.6s ease';
+    document.documentElement.style.setProperty('--grid-line',
+      ev.dark
+        ? 'oklch(0.30 0.05 278 / 0.5)'
+        : 'oklch(0.88 0.03 55 / 0.35)'
+    );
+  }, [heroIdx, schedule]);
+
+  const isDark = !!schedule[heroIdx].dark;
+
+  return (
+    <div style={{
+      width:'100%', maxWidth:390, minHeight:'100dvh',
+      background: schedule[heroIdx].pageBg,
+      transition:'background 0.6s ease',
+      display:'flex', flexDirection:'column',
+      paddingBottom:40,
+    }}>
+      <StatusBar now={now} dark={isDark} />
+      <HeroCard now={now} heroIdx={heroIdx} checks={heroChecks}
+                onToggle={toggleCheck} onComplete={handleComplete}
+                theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} />
+      <EventList now={now} heroIdx={heroIdx} dark={isDark} schedule={schedule} />
+
+      <TweaksPanel>
+        <TweakSection label="Акцент" />
+        <TweakSelect label="Цвят" value={t.accent}
+          options={['ice','aurora','sunset']}
+          onChange={v => setTweak('accent', v)} />
+        <TweakSection label="Дебъг" />
+        <TweakSelect label="Събитие" value={t.debugEvent}
+          options={eventOpts}
+          onChange={v => setTweak('debugEvent', v)} />
+        <TweakRadio label="Таймер" value={t.debugTimer}
+          options={['авто','обратно','изминало']}
+          onChange={v => setTweak('debugTimer', v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

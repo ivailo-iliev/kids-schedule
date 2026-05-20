@@ -1,0 +1,13 @@
+[build]
+publish = "."
+functions = "netlify/functions"
+
+[[redirects]]
+from = "/"
+to = "/Schedule.html"
+status = 200
+
+[[redirects]]
+from = "/api/google-calendar"
+to = "/.netlify/functions/google-calendar"
+status = 200
