@@ -31,7 +31,7 @@
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accent": "ice",
-  "debugEvent": "6:30 🌅",
+  "debugEvent": "авто",
   "debugTimer": "авто"
 }/*EDITMODE-END*/;
 
@@ -446,17 +446,18 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         )}
 
         {/* ④ Готово */}
-        {!isLast && <DoneButton onComplete={onComplete} accent={accent} />}
+        {!isLast && <DoneButton onComplete={onComplete} accent={accent} started={started} />}
       </div>
     </div>
   );
 }
 
-function DoneButton({ onComplete, accent }) {
+function DoneButton({ onComplete, accent, started }) {
   const [pressing, setPressing] = React.useState(false);
   return (
     <button
-      onClick={onComplete}
+      onClick={started ? onComplete : undefined}
+      disabled={!started}
       onPointerDown={() => setPressing(true)}
       onPointerUp={() => setPressing(false)}
       onPointerLeave={() => setPressing(false)}
@@ -465,10 +466,10 @@ function DoneButton({ onComplete, accent }) {
         background: accent, border:'none',
         borderRadius:16, color:'white',
         fontSize:15, fontWeight:800, letterSpacing:0.3,
-        cursor:'pointer', fontFamily:'inherit',
+        cursor: started ? 'pointer' : 'default', fontFamily:'inherit',
         display:'flex', alignItems:'center', justifyContent:'center', gap:8,
         transform: pressing ? 'scale(0.97)' : 'scale(1)',
-        opacity: pressing ? 0.85 : 1,
+        opacity: started ? (pressing ? 0.85 : 1) : 0.45,
         transition:'transform 0.1s, opacity 0.1s',
         boxShadow:`0 4px 14px oklch(0 0 0 / 0.12)`,
       }}
@@ -602,8 +603,9 @@ function App() {
   }, [heroIdx, schedule]);
 
   const handleComplete = React.useCallback(() => {
+    if (nowSec(now) < toSec(schedule[heroIdx].time)) return;
     setCompleted(prev => new Set([...prev, heroIdx]));
-  }, [heroIdx]);
+  }, [heroIdx, now, schedule]);
 
   /* Sync page + body bg and grid to current event */
   React.useEffect(() => {
