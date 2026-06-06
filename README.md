@@ -1,6 +1,6 @@
 # Моят Ден — Kids Training Schedule App
 
-A mobile-first, single-screen schedule app for a child athlete. It can run from a hardcoded fallback schedule, or read today’s events from Google Calendar through a Netlify Function.
+A mobile-first, installable schedule app for a child athlete. It reads today’s events from Google Calendar through a Netlify Function and can show the last downloaded events for the current date while offline.
 
 ## Files
 
@@ -8,6 +8,9 @@ A mobile-first, single-screen schedule app for a child athlete. It can run from 
 |------|---------|
 | `Schedule.html` | The app — open this in a browser |
 | `tweaks-panel.jsx` | In-page Tweaks UI (loaded by Schedule.html) |
+| `manifest.webmanifest` | PWA manifest for install metadata and icons |
+| `sw.js` | Service worker for app-shell and calendar response caching |
+| `icon.svg` | ⛸️ SVG app icon and favicon |
 | `netlify/functions/google-calendar.js` | Netlify Function that reads Google Calendar |
 | `netlify.toml` | Netlify routing for `/` and `/api/google-calendar` |
 
@@ -19,25 +22,16 @@ A mobile-first, single-screen schedule app for a child athlete. It can run from 
 - **Per-event checklists** — tap to check items; state is remembered per event
 - **Per-event colours** — page and hero card background shift for each activity type
 - **Dark mode** for Лека нощ (bedtime) to reduce eye strain
-- **Google Calendar sync** through Netlify Functions, with a hardcoded fallback if credentials are missing
+- **Google Calendar sync** through Netlify Functions; credentials are required for live events
+- **Offline support** through PWA assets and the last downloaded event list, but only when that saved list matches the current date
 
-## Schedule
+## Schedule source
 
-| Time  | Event                  |
-|-------|------------------------|
-| 6:30  | 🌅 Добро утро           |
-| 7:30  | ⛸️ Лед с Албена        |
-| 8:45  | 🥐 Закуска              |
-| 10:30 | ⛸️ Лед със Стоян       |
-| 11:45 | 🏃🏼‍♀️ Суха със Стоян       |
-| 13:00 | 🍝 Обяд                 |
-| 15:00 | ⛸️ Лед с Андрей        |
-| 16:30 | 🍦 Следобедна закуска   |
-| 17:00 | 🏃🏼‍♀️ Суха със Стоян       |
-| 19:30 | 🥗 Вечеря               |
-| 21:00 | 🌙 Лека нощ             |
+The app no longer includes a built-in hardcoded day of events. Events come from Google Calendar. If the calendar cannot be reached, the browser checks its saved calendar cache and displays it only when the saved `date` matches today in the calendar time zone. If there is no current-date cache, the app shows an empty-state message instead of stale events.
 
 ## Checklists
+
+Checklists are assigned from event templates inferred from calendar event text:
 
 - **Добро утро** — 🪥 Зъби · 👕 Дрехи · 🪮 Коса · 👟 Обуване
 - **Лед** — ⛸️ Кънки · 🪢 Ластик · 💧 Вода
@@ -84,5 +78,6 @@ This integration uses a **service account**, not a public API key. That is the r
 ### What the app does
 
 - The page calls `/.netlify/functions/google-calendar` through the `/api/google-calendar` redirect.
-- If the function is configured, it loads today’s events from Google Calendar.
-- If the function is not configured or fails, the app falls back to the bundled schedule so the page still works.
+- If the function is configured, it loads today’s events from Google Calendar and saves that mapped schedule in the browser.
+- If the request fails while offline, the app displays the saved schedule only when its calendar `date` is today for that time zone.
+- If the function is not configured, fails, or has no current-date cache, the app shows an empty state rather than using bundled events.
