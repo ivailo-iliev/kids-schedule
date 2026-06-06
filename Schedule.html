@@ -29,6 +29,8 @@
 
 <script type="text/babel">
 
+const { useCallback, useEffect, useMemo, useState, memo } = React;
+
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accent": "ice",
   "debugEvent": "авто",
@@ -320,16 +322,26 @@ function formatDiff(diff) {
 
 /* ── useNow hook ── */
 function useNow() {
-  const [now, setNow] = React.useState(new Date());
-  React.useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    let timeoutId;
+
+    const tick = () => {
+      const next = new Date();
+      setNow(next);
+      timeoutId = window.setTimeout(tick, 1000 - next.getMilliseconds());
+    };
+
+    timeoutId = window.setTimeout(tick, 1000 - new Date().getMilliseconds());
+    return () => window.clearTimeout(timeoutId);
   }, []);
+
   return now;
 }
 
 /* ── StatusBar ── */
-function StatusBar({ now, dark }) {
+const StatusBar = memo(function StatusBar({ now, dark }) {
   const col = dark ? 'oklch(0.62 0.06 280)' : 'oklch(0.42 0.06 258)';
   const col2 = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.58 0.05 258)';
   return (
@@ -343,11 +355,12 @@ function StatusBar({ now, dark }) {
       </span>
     </div>
   );
-}
+});
 
 /* ── CheckItem ── */
-function CheckItem({ emoji, label, checked, onToggle, dark }) {
-  const [pressing, setPressing] = React.useState(false);
+const CheckItem = memo(function CheckItem({ emoji, label, checked, index, onToggle, dark }) {
+  const [pressing, setPressing] = useState(false);
+  const handleToggle = useCallback(() => onToggle(index), [index, onToggle]);
   const unchBg    = dark ? 'oklch(1 0 0 / 0.10)' : 'oklch(1 0 0 / 0.55)';
   const chBg      = dark ? 'oklch(0.35 0.12 155 / 0.45)' : 'oklch(0.93 0.08 155)';
   const unchBord  = dark ? '1.5px solid oklch(1 0 0 / 0.20)' : '1.5px solid oklch(0.85 0.03 260)';
@@ -355,7 +368,7 @@ function CheckItem({ emoji, label, checked, onToggle, dark }) {
   const textCol   = dark ? (checked ? 'oklch(0.72 0.14 158)' : 'oklch(0.92 0.03 280)') : (checked ? 'oklch(0.45 0.12 158)' : 'oklch(0.25 0.07 260)');
   const badgeBg   = dark ? 'oklch(0.55 0.14 158)' : 'oklch(0.62 0.16 158)';
   return (
-    <button onClick={onToggle}
+    <button type="button" onClick={handleToggle}
       onPointerDown={() => setPressing(true)}
       onPointerUp={() => setPressing(false)}
       onPointerLeave={() => setPressing(false)}
@@ -390,7 +403,7 @@ function CheckItem({ emoji, label, checked, onToggle, dark }) {
         letterSpacing:'-0.1px' }}>{label}</span>
     </button>
   );
-}
+});
 
 /* ── HeroCard ── */
 function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTimer, schedule }) {
@@ -477,8 +490,8 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         {checks.length > 0 && (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:S[2], marginBottom:S[3] }}>
             {checks.map((item, i) => (
-              <CheckItem key={i} emoji={item.emoji} label={item.label}
-                         checked={item.checked} onToggle={() => onToggle(i)} dark={dark} />
+              <CheckItem key={`${item.emoji}-${item.label}`} emoji={item.emoji} label={item.label}
+                         checked={item.checked} index={i} onToggle={onToggle} dark={dark} />
             ))}
           </div>
         )}
@@ -490,10 +503,11 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
   );
 }
 
-function DoneButton({ onComplete, accent }) {
-  const [pressing, setPressing] = React.useState(false);
+const DoneButton = memo(function DoneButton({ onComplete, accent }) {
+  const [pressing, setPressing] = useState(false);
   return (
     <button
+      type="button"
       onClick={onComplete}
       onPointerDown={() => setPressing(true)}
       onPointerUp={() => setPressing(false)}
@@ -515,11 +529,10 @@ function DoneButton({ onComplete, accent }) {
       <span style={{ fontSize:T.md }}>✓</span>
     </button>
   );
-}
+});
 
 /* ── EventList ── */
-function EventList({ now, heroIdx, dark, schedule }) {
-  const ns = nowSec(now);
+const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
   const rowBg      = dark ? 'oklch(0.24 0.07 278)' : 'white';
   const textNorm   = dark ? 'oklch(0.85 0.04 280)' : 'oklch(0.22 0.06 258)';
   const textPast   = dark ? 'oklch(0.50 0.04 280)' : 'oklch(0.6 0.03 258)';
@@ -540,7 +553,7 @@ function EventList({ now, heroIdx, dark, schedule }) {
           const isPast    = i < heroIdx;
           const isCurrent = i === heroIdx;
           return (
-            <div key={i} style={{
+            <div key={`${ev.time}-${ev.name}`} style={{
               background: rowBg, borderRadius:R.md, padding:`${S[3]}px ${S[4]}px`,
               display:'flex', alignItems:'center', gap:S[2],
               boxShadow: isCurrent
@@ -571,55 +584,56 @@ function EventList({ now, heroIdx, dark, schedule }) {
       </div>
     </div>
   );
-}
+});
 
 /* ── App ── */
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const now = useNow();
-  const [schedule, setSchedule] = React.useState(() => getScheduleTemplateFallback());
+  const [schedule, setSchedule] = useState(() => getScheduleTemplateFallback());
   /* Per-event checklist state, keyed by event index */
-  const [checkStates, setCheckStates] = React.useState({});
+  const [checkStates, setCheckStates] = useState({});
 
   // Manual completions: set of event indices the child marked done
-  const [completed, setCompleted] = React.useState(new Set());
+  const [completed, setCompleted] = useState(new Set());
 
-  React.useEffect(() => {
-    let cancelled = false;
+  useEffect(() => {
+    const controller = new AbortController();
 
     async function loadCalendarSchedule() {
       try {
-        const response = await fetch(CALENDAR_ENDPOINT);
+        const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal });
         if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
         const data = await response.json();
         const timeZone = data.timeZone || 'Europe/Sofia';
         const mapped = calendarEventsToSchedule(data.events || [], timeZone);
-        if (!cancelled && mapped.length > 0) {
+        if (mapped.length > 0) {
           setSchedule(mapped);
         }
       } catch (error) {
+        if (error.name === 'AbortError') return;
         console.warn('Using bundled schedule because Google Calendar could not be loaded.', error);
       }
     }
 
     loadCalendarSchedule();
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setCompleted(new Set());
     setCheckStates({});
   }, [schedule]);
 
   // Debug overrides from Tweaks
-  const eventOpts = React.useMemo(() => ['авто', ...schedule.map(ev => `${ev.time} ${ev.emoji}`)], [schedule]);
-  const debugIdx = React.useMemo(() => (
+  const eventOpts = useMemo(() => ['авто', ...schedule.map(ev => `${ev.time} ${ev.emoji}`)], [schedule]);
+  const debugIdx = useMemo(() => (
     t.debugEvent !== 'авто'
       ? schedule.findIndex(ev => `${ev.time} ${ev.emoji}` === t.debugEvent)
       : -1
   ), [schedule, t.debugEvent]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (t.debugEvent !== 'авто' && !eventOpts.includes(t.debugEvent)) {
       setTweak('debugEvent', 'авто');
     }
@@ -627,13 +641,13 @@ function App() {
 
   const heroIdx = debugIdx >= 0 ? debugIdx : findHeroIdx(now, completed, schedule);
 
-  const heroChecks = React.useMemo(() => {
+  const heroChecks = useMemo(() => {
     const base = schedule[heroIdx].checklist.map(item => ({ ...item, checked: false }));
     const saved = checkStates[heroIdx] || [];
     return base.map((item, i) => ({ ...item, checked: saved[i] ?? false }));
   }, [heroIdx, checkStates, schedule]);
 
-  const toggleCheck = React.useCallback(i => {
+  const toggleCheck = useCallback(i => {
     setCheckStates(prev => {
       const current = (prev[heroIdx] || schedule[heroIdx].checklist.map(() => false));
       const next = [...current];
@@ -642,13 +656,13 @@ function App() {
     });
   }, [heroIdx, schedule]);
 
-  const handleComplete = React.useCallback(() => {
-    if (nowSec(now) < toSec(schedule[heroIdx].time)) return;
+  const handleComplete = useCallback(() => {
+    if (nowSec(new Date()) < toSec(schedule[heroIdx].time)) return;
     setCompleted(prev => new Set([...prev, heroIdx]));
-  }, [heroIdx, now, schedule]);
+  }, [heroIdx, schedule]);
 
   /* Sync page + body bg and grid to current event */
-  React.useEffect(() => {
+  useEffect(() => {
     const ev = schedule[heroIdx];
     document.body.style.background = ev.pageBg;
     document.body.style.transition = 'background 0.6s ease';
@@ -692,7 +706,11 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
 </script>
 </body>
 </html>
