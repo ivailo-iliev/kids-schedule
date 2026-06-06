@@ -41,15 +41,6 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 const ICE_LIST  = [{ emoji:'⛸️', label:'Кънки' }, { emoji:'🪢', label:'Ластик' }, { emoji:'💧', label:'Вода' }];
 const SUHA_LIST = [{ emoji:'🎒', label:'Чанта' }, { emoji:'🌀', label:'Постелка' }, { emoji:'💧', label:'Вода' }];
 
-/* Activity → emoji by name keyword (overrides the event's stored emoji
-   for off-ice training types, so renames stay consistent). */
-function emojiFor(name, fallback) {
-  const n = (name || '').toLowerCase();
-  if (/разтяжк/.test(n)) return '🌀';
-  if (/суха|сфп|офп/.test(n)) return '🏃';
-  return fallback;
-}
-
 const DEFAULT_SCHEDULE = [
   { time: '6:30',  name: 'Добро утро',     emoji: '🌅', location: null,
     pageBg:'oklch(0.96 0.04 62)',  cardFrom:'oklch(0.93 0.07 60)',  cardTo:'oklch(0.98 0.02 75)',
@@ -211,6 +202,28 @@ function cloneSchedule(schedule) {
   return schedule.map(ev => ({ ...ev, checklist: cloneChecklist(ev.checklist || []) }));
 }
 
+function eventFromTemplate(kind, overrides = {}) {
+  const template = TEMPLATE_BY_KIND[kind] || TEMPLATE_BY_KIND.default;
+  const event = {
+    kind,
+    emoji: template.emoji,
+    name: template.name,
+    location: template.location,
+    pageBg: template.pageBg,
+    cardFrom: template.cardFrom,
+    cardTo: template.cardTo,
+    dark: !!template.dark,
+    checklist: cloneChecklist(template.checklist),
+    ...overrides,
+  };
+
+  if (overrides.location === undefined) event.location = template.location;
+  if (overrides.checklist === undefined) event.checklist = cloneChecklist(template.checklist);
+  if (overrides.dark === undefined) event.dark = !!template.dark;
+
+  return event;
+}
+
 function toSec(timeStr) {
   const [h, m] = timeStr.split(':').map(Number);
   return h * 3600 + m * 60;
@@ -240,7 +253,7 @@ function inferKind(summary = '', description = '', location = '') {
   if (text.includes('обяд') || text.includes('lunch')) return 'lunch';
   if (text.includes('вечеря') || text.includes('dinner')) return 'dinner';
   if (text.includes('закуска') || text.includes('breakfast')) return 'breakfast';
-  if (text.includes('суха') || text.includes('dry') || text.includes('gym') || text.includes('strength')) return 'dry';
+  if (/суха|сфп|офп|разтяжк|off[- ]?ice|dry|gym|strength|stretch/.test(text)) return 'dry';
   if (text.includes('лед') || text.includes('ice') || text.includes('skate') || text.includes('⛸')) return 'ice';
   return 'default';
 }
@@ -248,17 +261,10 @@ function inferKind(summary = '', description = '', location = '') {
 function styleFromEvent(event) {
   const kind = inferKind(event.summary, event.description, event.location);
   const template = TEMPLATE_BY_KIND[kind] || TEMPLATE_BY_KIND.default;
-  return {
-    kind,
-    emoji: template.emoji,
+  return eventFromTemplate(kind, {
     name: event.summary?.trim() || template.name,
     location: event.location ?? template.location,
-    pageBg: template.pageBg,
-    cardFrom: template.cardFrom,
-    cardTo: template.cardTo,
-    dark: !!template.dark,
-    checklist: cloneChecklist(template.checklist),
-  };
+  });
 }
 
 function calendarEventsToSchedule(events, timeZone) {
@@ -445,13 +451,13 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
       <div style={{
         position:'absolute', top:-10, right:10, fontSize:130, lineHeight:1,
         opacity:0.08, pointerEvents:'none', userSelect:'none', filter:'blur(2px)',
-      }}>{emojiFor(ev.name, ev.emoji)}</div>
+      }}>{ev.emoji}</div>
 
       <div style={{ padding:`${S[6]}px ${S[5]}px ${S[5]}px`, position:'relative' }}>
 
         {/* ① Event identity — left aligned */}
         <div style={{ display:'flex', alignItems:'center', gap:S[3], marginBottom:S[5] }}>
-          <span style={{ fontSize:T.emojiHero, lineHeight:1, flexShrink:0 }}>{emojiFor(ev.name, ev.emoji)}</span>
+          <span style={{ fontSize:T.emojiHero, lineHeight:1, flexShrink:0 }}>{ev.emoji}</span>
           <div style={{ minWidth:0, flex:1 }}>
             <div style={{ fontSize:T.xl, fontWeight:W.dis, letterSpacing:'-0.5px',
                           lineHeight:1.15, color:titleCol, marginBottom:S[1] }}>{ev.name}</div>
@@ -572,7 +578,7 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
                                color: isPast ? timePast : timeNorm,
                                minWidth:50, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
               )}
-              <span style={{ fontSize:T.emojiList, lineHeight:1 }}>{emojiFor(ev.name, ev.emoji)}</span>
+              <span style={{ fontSize:T.emojiList, lineHeight:1 }}>{ev.emoji}</span>
               <span style={{ fontSize:T.lg, fontWeight:W.reg, flex:1, minWidth:0,
                              color: isPast ? textPast : textNorm,
                              textDecoration: isPast ? 'line-through' : 'none',
