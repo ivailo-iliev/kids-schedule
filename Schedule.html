@@ -39,6 +39,15 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 const ICE_LIST  = [{ emoji:'⛸️', label:'Кънки' }, { emoji:'🪢', label:'Ластик' }, { emoji:'💧', label:'Вода' }];
 const SUHA_LIST = [{ emoji:'🎒', label:'Чанта' }, { emoji:'🌀', label:'Постелка' }, { emoji:'💧', label:'Вода' }];
 
+/* Activity → emoji by name keyword (overrides the event's stored emoji
+   for off-ice training types, so renames stay consistent). */
+function emojiFor(name, fallback) {
+  const n = (name || '').toLowerCase();
+  if (/разтяжк/.test(n)) return '🌀';
+  if (/суха|сфп|офп/.test(n)) return '🏃';
+  return fallback;
+}
+
 const DEFAULT_SCHEDULE = [
   { time: '6:30',  name: 'Добро утро',     emoji: '🌅', location: null,
     pageBg:'oklch(0.96 0.04 62)',  cardFrom:'oklch(0.93 0.07 60)',  cardTo:'oklch(0.98 0.02 75)',
@@ -325,7 +334,7 @@ function StatusBar({ now, dark }) {
   const col2 = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.58 0.05 258)';
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-                  padding:`${S[4] - 2}px ${S[6]}px ${S[1]}px`, userSelect:'none' }}>
+                  padding:`${S[4]}px ${S[6]}px ${S[1]}px`, userSelect:'none' }}>
       <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
         {pad(now.getHours())}:{pad(now.getMinutes())}
       </span>
@@ -343,7 +352,8 @@ function CheckItem({ emoji, label, checked, onToggle, dark }) {
   const chBg      = dark ? 'oklch(0.35 0.12 155 / 0.45)' : 'oklch(0.93 0.08 155)';
   const unchBord  = dark ? '1.5px solid oklch(1 0 0 / 0.20)' : '1.5px solid oklch(0.85 0.03 260)';
   const chBord    = dark ? '1.5px solid oklch(0.55 0.14 158 / 0.7)' : '1.5px solid oklch(0.65 0.14 158)';
-  const textCol   = dark ? (checked ? 'oklch(0.72 0.14 158)' : 'oklch(0.88 0.03 280)') : (checked ? 'oklch(0.45 0.12 158)' : 'oklch(0.3 0.07 260)');
+  const textCol   = dark ? (checked ? 'oklch(0.72 0.14 158)' : 'oklch(0.92 0.03 280)') : (checked ? 'oklch(0.45 0.12 158)' : 'oklch(0.25 0.07 260)');
+  const badgeBg   = dark ? 'oklch(0.55 0.14 158)' : 'oklch(0.62 0.16 158)';
   return (
     <button onClick={onToggle}
       onPointerDown={() => setPressing(true)}
@@ -352,22 +362,32 @@ function CheckItem({ emoji, label, checked, onToggle, dark }) {
       style={{
         background: checked ? chBg : unchBg,
         border: checked ? chBord : unchBord,
-        borderRadius:R.lg, padding:`${S[3]}px ${S[2]}px ${S[2] + 2}px`,
-        display:'flex', flexDirection:'column', alignItems:'center', gap:S[1] + 1,
-        cursor:'pointer', fontFamily:'inherit', minHeight:82,
+        borderRadius:R.lg, padding:`${S[3]}px ${S[2]}px`,
+        display:'flex', flexDirection:'column', alignItems:'center', gap:S[1],
+        cursor:'pointer', fontFamily:'inherit',
         transform: pressing ? 'scale(0.92)' : 'scale(1)',
         transition:'transform 0.12s, background 0.18s',
       }}>
-      <span style={{ fontSize:T.emojiCheck, lineHeight:1, opacity: checked ? 0.6 : 1 }}>{emoji}</span>
-      <span style={{ fontSize:T.xs, fontWeight:W.em, color:textCol,
-        textDecoration: checked ? 'line-through' : 'none' }}>{label}</span>
-      <div style={{
-        width:18, height:18, borderRadius:'50%',
-        background: checked ? (dark ? 'oklch(0.55 0.14 158)' : 'oklch(0.65 0.14 158)') : 'transparent',
-        border: checked ? 'none' : `1.5px solid ${dark ? 'oklch(0.5 0.03 280)' : 'oklch(0.75 0.03 260)'}`,
-        display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:T.xs, color:'white', fontWeight:W.dis, transition:'all 0.18s',
-      }}>{checked ? '✓' : ''}</div>
+      <div style={{ position:'relative', lineHeight:1 }}>
+        <span style={{ fontSize:T.emojiCheck, lineHeight:1, display:'block',
+          opacity: checked ? 0.55 : 1, filter: checked ? 'saturate(0.7)' : 'none',
+          transition:'opacity 0.18s, filter 0.18s' }}>{emoji}</span>
+        {checked && (
+          <div style={{
+            position:'absolute', right:-6, bottom:-4,
+            width:20, height:20, borderRadius:'50%',
+            background: badgeBg,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:T.xs, color:'white', fontWeight:W.dis,
+            boxShadow:'0 2px 5px oklch(0 0 0 / 0.25)',
+            border: dark ? '2px solid oklch(0.22 0.07 278)' : '2px solid white',
+          }}>✓</div>
+        )}
+      </div>
+      <span style={{ fontSize:T.sm, fontWeight:W.em, color:textCol,
+        textDecoration: checked ? 'line-through' : 'none',
+        textDecorationThickness:'1.5px',
+        letterSpacing:'-0.1px' }}>{label}</span>
     </button>
   );
 }
@@ -412,17 +432,17 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
       <div style={{
         position:'absolute', top:-10, right:10, fontSize:130, lineHeight:1,
         opacity:0.08, pointerEvents:'none', userSelect:'none', filter:'blur(2px)',
-      }}>{ev.emoji}</div>
+      }}>{emojiFor(ev.name, ev.emoji)}</div>
 
-      <div style={{ padding:`${S[6]}px ${S[5] + 2}px ${S[5]}px`, position:'relative' }}>
+      <div style={{ padding:`${S[6]}px ${S[5]}px ${S[5]}px`, position:'relative' }}>
 
         {/* ① Event identity — left aligned */}
-        <div style={{ display:'flex', alignItems:'center', gap:S[3], marginBottom:S[5] - 2 }}>
-          <span style={{ fontSize:T.emojiHero, lineHeight:1, flexShrink:0 }}>{ev.emoji}</span>
-          <div>
+        <div style={{ display:'flex', alignItems:'center', gap:S[3], marginBottom:S[5] }}>
+          <span style={{ fontSize:T.emojiHero, lineHeight:1, flexShrink:0 }}>{emojiFor(ev.name, ev.emoji)}</span>
+          <div style={{ minWidth:0, flex:1 }}>
             <div style={{ fontSize:T.xl, fontWeight:W.dis, letterSpacing:'-0.5px',
-                          lineHeight:1.1, color:titleCol, marginBottom:S[1] - 1 }}>{ev.name}</div>
-            <div style={{ fontSize:T.xs, fontWeight:W.reg, color:metaCol }}>
+                          lineHeight:1.15, color:titleCol, marginBottom:S[1] }}>{ev.name}</div>
+            <div style={{ fontSize:T.md, fontWeight:W.reg, color:metaCol, letterSpacing:'-0.1px' }}>
               {ev.location ? `${ev.time} · ${ev.location}` : ev.time}
             </div>
           </div>
@@ -431,11 +451,11 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         {/* ② Timer zone — centred pill */}
         <div style={{
           background: timerBg, borderRadius:R.xl, textAlign:'center',
-          padding:`${S[4] - 2}px ${S[5]}px ${S[3]}px`, marginBottom:S[4],
+          padding:`${S[4]}px ${S[5]}px ${S[3]}px`, marginBottom:S[4],
         }}>
           <div style={{
             fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
-            textTransform:'uppercase', color:labelCol, marginBottom:6,
+            textTransform:'uppercase', color:labelCol, marginBottom:S[2],
           }}>
             {started ? 'Започна преди' : 'След'}
           </div>
@@ -455,7 +475,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
 
         {/* ③ Checklist */}
         {checks.length > 0 && (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:8, marginBottom:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:S[2], marginBottom:S[3] }}>
             {checks.map((item, i) => (
               <CheckItem key={i} emoji={item.emoji} label={item.label}
                          checked={item.checked} onToggle={() => onToggle(i)} dark={dark} />
@@ -464,30 +484,29 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         )}
 
         {/* ④ Готово */}
-        {!isLast && <DoneButton onComplete={onComplete} accent={accent} started={started} />}
+        {!isLast && <DoneButton onComplete={onComplete} accent={accent} />}
       </div>
     </div>
   );
 }
 
-function DoneButton({ onComplete, accent, started }) {
+function DoneButton({ onComplete, accent }) {
   const [pressing, setPressing] = React.useState(false);
   return (
     <button
-      onClick={started ? onComplete : undefined}
-      disabled={!started}
+      onClick={onComplete}
       onPointerDown={() => setPressing(true)}
       onPointerUp={() => setPressing(false)}
       onPointerLeave={() => setPressing(false)}
       style={{
-        width:'100%', marginTop:S[4] - 2, padding:`${S[3] + 1}px ${S[4]}px`,
+        width:'100%', marginTop:S[4], padding:`${S[3]}px ${S[4]}px`,
         background: accent, border:'none',
         borderRadius:R.lg, color:'white',
-        fontSize:T.md, fontWeight:W.dis, letterSpacing:0.3,
-        cursor: started ? 'pointer' : 'default', fontFamily:'inherit',
+        fontSize:T.md, fontWeight:W.em, letterSpacing:0.3,
+        cursor:'pointer', fontFamily:'inherit',
         display:'flex', alignItems:'center', justifyContent:'center', gap:S[2],
         transform: pressing ? 'scale(0.97)' : 'scale(1)',
-        opacity: started ? (pressing ? 0.85 : 1) : 0.45,
+        opacity: pressing ? 0.85 : 1,
         transition:'transform 0.1s, opacity 0.1s',
         boxShadow:`0 4px 14px oklch(0 0 0 / 0.12)`,
       }}
@@ -515,15 +534,15 @@ function EventList({ now, heroIdx, dark, schedule }) {
     <div style={{ padding:`${S[4]}px ${S[4]}px 0` }}>
       <div style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
                     textTransform:'uppercase', color:sectionCol,
-                    marginBottom:S[3] - 2, paddingLeft:S[1] }}>Днес</div>
-      <div style={{ display:'flex', flexDirection:'column', gap:S[2] - 1 }}>
+                    marginBottom:S[3], paddingLeft:S[1] }}>Днес</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:S[2] }}>
         {schedule.map((ev, i) => {
           const isPast    = i < heroIdx;
           const isCurrent = i === heroIdx;
           return (
             <div key={i} style={{
-              background: rowBg, borderRadius:R.md, padding:`${S[3] - 1}px ${S[4]}px`,
-              display:'flex', alignItems:'center', gap:S[3],
+              background: rowBg, borderRadius:R.md, padding:`${S[3]}px ${S[4]}px`,
+              display:'flex', alignItems:'center', gap:S[2],
               boxShadow: isCurrent
                 ? (dark ? '0 4px 18px oklch(0.1 0.06 278 / 0.5)' : '0 4px 18px oklch(0.4 0.06 258 / 0.14)')
                 : (dark ? 'none' : '0 2px 8px oklch(0.4 0.05 258 / 0.06)'),
@@ -531,18 +550,21 @@ function EventList({ now, heroIdx, dark, schedule }) {
               borderLeft: isCurrent ? borderCur : '3px solid transparent',
               transition:'opacity 0.3s',
             }}>
-              <span style={{ fontSize:T.md, fontWeight:W.em,
-                             color: isPast ? timePast : timeNorm,
-                             minWidth:42, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
-              <span style={{ fontSize:T.emojiList, lineHeight:1 }}>{ev.emoji}</span>
-              <span style={{ fontSize:T.lg, fontWeight:W.reg, flex:1,
+              {isCurrent ? (
+                <span style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:1, textTransform:'uppercase',
+                               color:pillCol, background:pillBg, padding:`${S[1]}px ${S[2]}px`, borderRadius:R.sm,
+                               minWidth:50, textAlign:'center', flexShrink:0 }}>сега</span>
+              ) : (
+                <span style={{ fontSize:T.md, fontWeight:W.em,
+                               color: isPast ? timePast : timeNorm,
+                               minWidth:50, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
+              )}
+              <span style={{ fontSize:T.emojiList, lineHeight:1 }}>{emojiFor(ev.name, ev.emoji)}</span>
+              <span style={{ fontSize:T.lg, fontWeight:W.reg, flex:1, minWidth:0,
                              color: isPast ? textPast : textNorm,
                              textDecoration: isPast ? 'line-through' : 'none',
-                             textDecorationColor: dark ? 'oklch(0.4 0.04 280)' : 'oklch(0.7 0.03 258)' }}>{ev.name}</span>
-              {isCurrent && (
-                <span style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:1.5, textTransform:'uppercase',
-                               color:pillCol, background:pillBg, padding:`${S[1] - 1}px ${S[2] - 1}px`, borderRadius:R.sm - 2 }}>сега</span>
-              )}
+                             textDecorationColor: dark ? 'oklch(0.4 0.04 280)' : 'oklch(0.7 0.03 258)',
+                             letterSpacing:'-0.2px' }}>{ev.name}</span>
             </div>
           );
         })}
