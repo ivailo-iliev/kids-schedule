@@ -500,7 +500,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
 
         {/* ③ Checklist */}
         {checks.length > 0 && (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:S[2], marginBottom:S[3] }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:S[2] }}>
             {checks.map((item, i) => (
               <CheckItem key={`${item.emoji}-${item.label}`} emoji={item.emoji} label={item.label}
                          checked={item.checked} index={i} onToggle={onToggle} dark={dark} />
