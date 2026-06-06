@@ -54,7 +54,7 @@ const DEFAULT_SCHEDULE = [
   { time: '10:30', name: 'Лед със Стоян',  emoji: '⛸️', location: 'Ледена пързалка',
     pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
     checklist: ICE_LIST },
-  { time: '11:45', name: 'Суха със Стоян', emoji: '💪', location: null,
+  { time: '11:45', name: 'Суха със Стоян', emoji: '🏃🏼‍♀️', location: null,
     pageBg:'oklch(0.95 0.04 50)',  cardFrom:'oklch(0.91 0.08 47)',  cardTo:'oklch(0.97 0.02 60)',
     checklist: SUHA_LIST },
   { time: '13:00', name: 'Обяд',            emoji: '🍝', location: null,
@@ -63,10 +63,10 @@ const DEFAULT_SCHEDULE = [
   { time: '15:00', name: 'Лед с Андрей',   emoji: '⛸️', location: 'Ледена пързалка',
     pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
     checklist: ICE_LIST },
-  { time: '16:30', name: 'Следобедна закуска', emoji: '🍎', location: null,
+  { time: '16:30', name: 'Следобедна закуска', emoji: '🍦', location: null,
     pageBg:'oklch(0.95 0.05 68)',  cardFrom:'oklch(0.91 0.09 65)',  cardTo:'oklch(0.97 0.03 78)',
     checklist: [] },
-  { time: '17:00', name: 'Суха със Стоян', emoji: '💪', location: null,
+  { time: '17:00', name: 'Суха със Стоян', emoji: '🏃🏼‍♀️', location: null,
     pageBg:'oklch(0.95 0.04 50)',  cardFrom:'oklch(0.91 0.08 47)',  cardTo:'oklch(0.97 0.02 60)',
     checklist: SUHA_LIST },
   { time: '19:30', name: 'Вечеря',          emoji: '🥗', location: null,
@@ -132,7 +132,7 @@ const TEMPLATE_BY_KIND = {
     checklist: [],
   },
   dry: {
-    emoji: '💪',
+    emoji: '🏃🏼‍♀️',
     name: 'Суха',
     location: null,
     pageBg:'oklch(0.95 0.04 50)',
@@ -150,7 +150,7 @@ const TEMPLATE_BY_KIND = {
     checklist: [],
   },
   snack: {
-    emoji: '🍎',
+    emoji: '🍦',
     name: 'Следобедна закуска',
     location: null,
     pageBg:'oklch(0.95 0.05 68)',
@@ -352,7 +352,7 @@ const StatusBar = memo(function StatusBar({ now, dark }) {
   const col2 = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.58 0.05 258)';
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-                  padding:`${S[4]}px ${S[6]}px ${S[1]}px`, userSelect:'none' }}>
+                  padding:`${S[4]}px ${S[4]}px ${S[1]}px`, userSelect:'none' }}>
       <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
         {pad(now.getHours())}:{pad(now.getMinutes())}
       </span>
@@ -442,7 +442,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
 
   return (
     <div style={{
-      margin:`${S[2]}px ${S[4]}px 0`, borderRadius:R.xxl, overflow:'hidden',
+      margin:`${S[2]}px ${S[3]}px 0`, borderRadius:R.xxl, overflow:'hidden',
       background:`linear-gradient(160deg, ${ev.cardFrom} 0%, ${ev.cardTo} 100%)`,
       boxShadow:'0 8px 32px oklch(0.4 0.06 260 / 0.10)',
       position:'relative',
@@ -453,10 +453,10 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         opacity:0.08, pointerEvents:'none', userSelect:'none', filter:'blur(2px)',
       }}>{ev.emoji}</div>
 
-      <div style={{ padding:`${S[6]}px ${S[5]}px ${S[5]}px`, position:'relative' }}>
+      <div style={{ padding:`${S[5]}px ${S[4]}px ${S[4]}px`, position:'relative' }}>
 
         {/* ① Event identity — left aligned */}
-        <div style={{ display:'flex', alignItems:'center', gap:S[3], marginBottom:S[5] }}>
+        <div style={{ display:'flex', alignItems:'center', gap:S[2], marginBottom:S[4] }}>
           <span style={{ fontSize:T.emojiHero, lineHeight:1, flexShrink:0 }}>{ev.emoji}</span>
           <div style={{ minWidth:0, flex:1 }}>
             <div style={{ fontSize:T.xl, fontWeight:W.dis, letterSpacing:'-0.5px',
@@ -470,11 +470,11 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         {/* ② Timer zone — centred pill */}
         <div style={{
           background: timerBg, borderRadius:R.xl, textAlign:'center',
-          padding:`${S[4]}px ${S[5]}px ${S[3]}px`, marginBottom:S[4],
+          padding:`${S[3]}px ${S[4]}px ${S[2]}px`, marginBottom:S[3],
         }}>
           <div style={{
             fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
-            textTransform:'uppercase', color:labelCol, marginBottom:S[2],
+            textTransform:'uppercase', color:labelCol, marginBottom:S[1],
           }}>
             {started ? 'Започна преди' : 'След'}
           </div>
@@ -519,7 +519,7 @@ const DoneButton = memo(function DoneButton({ onComplete, accent }) {
       onPointerUp={() => setPressing(false)}
       onPointerLeave={() => setPressing(false)}
       style={{
-        width:'100%', marginTop:S[4], padding:`${S[3]}px ${S[4]}px`,
+        width:'100%', marginTop:S[3], padding:`${S[3]}px ${S[3]}px`,
         background: accent, border:'none',
         borderRadius:R.lg, color:'white',
         fontSize:T.md, fontWeight:W.em, letterSpacing:0.3,
@@ -550,17 +550,17 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
   const pillCol    = dark ? 'oklch(0.72 0.10 280)' : 'oklch(0.48 0.16 350)';
 
   return (
-    <div style={{ padding:`${S[4]}px ${S[4]}px 0` }}>
+    <div style={{ padding:`${S[3]}px ${S[3]}px 0` }}>
       <div style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
                     textTransform:'uppercase', color:sectionCol,
-                    marginBottom:S[3], paddingLeft:S[1] }}>Днес</div>
+                    marginBottom:S[2], paddingLeft:S[1] }}>Днес</div>
       <div style={{ display:'flex', flexDirection:'column', gap:S[2] }}>
         {schedule.map((ev, i) => {
           const isPast    = i < heroIdx;
           const isCurrent = i === heroIdx;
           return (
             <div key={`${ev.time}-${ev.name}`} style={{
-              background: rowBg, borderRadius:R.md, padding:`${S[3]}px ${S[4]}px`,
+              background: rowBg, borderRadius:R.md, padding:`${S[3]}px ${S[3]}px`,
               display:'flex', alignItems:'center', gap:S[2],
               boxShadow: isCurrent
                 ? (dark ? '0 4px 18px oklch(0.1 0.06 278 / 0.5)' : '0 4px 18px oklch(0.4 0.06 258 / 0.14)')
