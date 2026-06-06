@@ -83,6 +83,24 @@ const THEMES = {
   sunset: { accent:'oklch(0.45 0.16 295)' },
 };
 
+/* ── Design tokens ──────────────────────────────────────────
+   Fixed sizes keep text predictable instead of measuring and fitting it. */
+const T = {                  // type scale (px)
+  xs:   12,                  // eyebrows, pills, badges
+  sm:   14,                  // secondary text, small labels
+  md:   16,                  // body, list time
+  lg:   18,                  // list item name, body large
+  xl:   22,                  // hero title
+  emojiList:    22,          // emoji in row
+  emojiCheck:   38,          // emoji in checklist tile
+  emojiHero:    50,          // emoji in hero identity
+  display:      72,          // timer
+  displaySmall: 56,          // timer when ≥100 min
+};
+const W = { reg:700, em:800, dis:900 };      // weights
+const S = { 1:4, 2:8, 3:12, 4:16, 5:20, 6:24 };  // spacing (4-px base)
+const R = { sm:10, md:14, lg:16, xl:20, xxl:28 }; // radii
+
 const TEMPLATE_BY_KIND = {
   morning: {
     emoji: '🌅',
@@ -307,11 +325,11 @@ function StatusBar({ now, dark }) {
   const col2 = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.58 0.05 258)';
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-                  padding:'14px 24px 4px', userSelect:'none' }}>
-      <span style={{ fontSize:15, fontWeight:800, color:col, letterSpacing:'-0.3px' }}>
+                  padding:`${S[4] - 2}px ${S[6]}px ${S[1]}px`, userSelect:'none' }}>
+      <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
         {pad(now.getHours())}:{pad(now.getMinutes())}
       </span>
-      <span style={{ fontSize:13, fontWeight:700, color:col2 }}>
+      <span style={{ fontSize:T.sm, fontWeight:W.reg, color:col2 }}>
         {BG_DAYS[now.getDay()]} · {now.getDate()}.{pad(now.getMonth()+1)}
       </span>
     </div>
@@ -334,21 +352,21 @@ function CheckItem({ emoji, label, checked, onToggle, dark }) {
       style={{
         background: checked ? chBg : unchBg,
         border: checked ? chBord : unchBord,
-        borderRadius:16, padding:'12px 8px 10px',
-        display:'flex', flexDirection:'column', alignItems:'center', gap:5,
+        borderRadius:R.lg, padding:`${S[3]}px ${S[2]}px ${S[2] + 2}px`,
+        display:'flex', flexDirection:'column', alignItems:'center', gap:S[1] + 1,
         cursor:'pointer', fontFamily:'inherit', minHeight:82,
         transform: pressing ? 'scale(0.92)' : 'scale(1)',
         transition:'transform 0.12s, background 0.18s',
       }}>
-      <span style={{ fontSize:26, lineHeight:1, opacity: checked ? 0.6 : 1 }}>{emoji}</span>
-      <span style={{ fontSize:11, fontWeight:800, color:textCol,
+      <span style={{ fontSize:T.emojiCheck, lineHeight:1, opacity: checked ? 0.6 : 1 }}>{emoji}</span>
+      <span style={{ fontSize:T.xs, fontWeight:W.em, color:textCol,
         textDecoration: checked ? 'line-through' : 'none' }}>{label}</span>
       <div style={{
         width:18, height:18, borderRadius:'50%',
         background: checked ? (dark ? 'oklch(0.55 0.14 158)' : 'oklch(0.65 0.14 158)') : 'transparent',
         border: checked ? 'none' : `1.5px solid ${dark ? 'oklch(0.5 0.03 280)' : 'oklch(0.75 0.03 260)'}`,
         display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:10, color:'white', fontWeight:900, transition:'all 0.18s',
+        fontSize:T.xs, color:'white', fontWeight:W.dis, transition:'all 0.18s',
       }}>{checked ? '✓' : ''}</div>
     </button>
   );
@@ -370,7 +388,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
   const absSec  = Math.abs(Math.round(effectiveDiff));
   const min     = Math.floor(absSec / 60);
   const sec     = absSec % 60;
-  const bigSize = min >= 100 ? 58 : 72;
+  const bigSize = min >= 100 ? T.displaySmall : T.display;
 
   /* color tokens that flip for dark card */
   const titleCol   = dark ? 'oklch(0.95 0.04 282)' : 'oklch(0.18 0.07 260)';
@@ -385,7 +403,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
 
   return (
     <div style={{
-      margin:'8px 16px 0', borderRadius:28, overflow:'hidden',
+      margin:`${S[2]}px ${S[4]}px 0`, borderRadius:R.xxl, overflow:'hidden',
       background:`linear-gradient(160deg, ${ev.cardFrom} 0%, ${ev.cardTo} 100%)`,
       boxShadow:'0 8px 32px oklch(0.4 0.06 260 / 0.10)',
       position:'relative',
@@ -396,15 +414,15 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         opacity:0.08, pointerEvents:'none', userSelect:'none', filter:'blur(2px)',
       }}>{ev.emoji}</div>
 
-      <div style={{ padding:'24px 22px 20px', position:'relative' }}>
+      <div style={{ padding:`${S[6]}px ${S[5] + 2}px ${S[5]}px`, position:'relative' }}>
 
         {/* ① Event identity — left aligned */}
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18 }}>
-          <span style={{ fontSize:50, lineHeight:1, flexShrink:0 }}>{ev.emoji}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:S[3], marginBottom:S[5] - 2 }}>
+          <span style={{ fontSize:T.emojiHero, lineHeight:1, flexShrink:0 }}>{ev.emoji}</span>
           <div>
-            <div style={{ fontSize:22, fontWeight:900, letterSpacing:'-0.5px',
-                          lineHeight:1.1, color:titleCol, marginBottom:3 }}>{ev.name}</div>
-            <div style={{ fontSize:12, fontWeight:700, color:metaCol }}>
+            <div style={{ fontSize:T.xl, fontWeight:W.dis, letterSpacing:'-0.5px',
+                          lineHeight:1.1, color:titleCol, marginBottom:S[1] - 1 }}>{ev.name}</div>
+            <div style={{ fontSize:T.xs, fontWeight:W.reg, color:metaCol }}>
               {ev.location ? `${ev.time} · ${ev.location}` : ev.time}
             </div>
           </div>
@@ -412,11 +430,11 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
 
         {/* ② Timer zone — centred pill */}
         <div style={{
-          background: timerBg, borderRadius:20, textAlign:'center',
-          padding:'14px 20px 12px', marginBottom:16,
+          background: timerBg, borderRadius:R.xl, textAlign:'center',
+          padding:`${S[4] - 2}px ${S[5]}px ${S[3]}px`, marginBottom:S[4],
         }}>
           <div style={{
-            fontSize:11, fontWeight:800, letterSpacing:2.5,
+            fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
             textTransform:'uppercase', color:labelCol, marginBottom:6,
           }}>
             {started ? 'Започна преди' : 'След'}
@@ -424,13 +442,13 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
           <div style={{ display:'flex', justifyContent:'center', alignItems:'baseline' }}>
             {/* mirror spacer + sign keep digits centred */}
             <span style={{ opacity: started ? 1 : 0, visibility: started ? 'visible' : 'hidden',
-              fontSize:bigSize, fontWeight:900, lineHeight:1, color:timerCol,
+              fontSize:bigSize, fontWeight:W.dis, lineHeight:1, color:timerCol,
               marginRight:1, letterSpacing:0 }}>−</span>
-            <span style={{ fontSize:bigSize, fontWeight:900, lineHeight:1,
+            <span style={{ fontSize:bigSize, fontWeight:W.dis, lineHeight:1,
               letterSpacing:'-4px', fontVariantNumeric:'tabular-nums', color:timerCol,
               transition:'color 0.4s' }}>{`${pad(min)}:${pad(sec)}`}</span>
             <span style={{ visibility:'hidden',
-              fontSize:bigSize, fontWeight:900, lineHeight:1,
+              fontSize:bigSize, fontWeight:W.dis, lineHeight:1,
               marginLeft:1, letterSpacing:0 }}>−</span>
           </div>
         </div>
@@ -462,12 +480,12 @@ function DoneButton({ onComplete, accent, started }) {
       onPointerUp={() => setPressing(false)}
       onPointerLeave={() => setPressing(false)}
       style={{
-        width:'100%', marginTop:14, padding:'13px 16px',
+        width:'100%', marginTop:S[4] - 2, padding:`${S[3] + 1}px ${S[4]}px`,
         background: accent, border:'none',
-        borderRadius:16, color:'white',
-        fontSize:15, fontWeight:800, letterSpacing:0.3,
+        borderRadius:R.lg, color:'white',
+        fontSize:T.md, fontWeight:W.dis, letterSpacing:0.3,
         cursor: started ? 'pointer' : 'default', fontFamily:'inherit',
-        display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+        display:'flex', alignItems:'center', justifyContent:'center', gap:S[2],
         transform: pressing ? 'scale(0.97)' : 'scale(1)',
         opacity: started ? (pressing ? 0.85 : 1) : 0.45,
         transition:'transform 0.1s, opacity 0.1s',
@@ -475,7 +493,7 @@ function DoneButton({ onComplete, accent, started }) {
       }}
     >
       <span>Готово</span>
-      <span style={{ fontSize:16 }}>✓</span>
+      <span style={{ fontSize:T.md }}>✓</span>
     </button>
   );
 }
@@ -494,18 +512,18 @@ function EventList({ now, heroIdx, dark, schedule }) {
   const pillCol    = dark ? 'oklch(0.72 0.10 280)' : 'oklch(0.48 0.16 350)';
 
   return (
-    <div style={{ padding:'16px 16px 0' }}>
-      <div style={{ fontSize:10, fontWeight:800, letterSpacing:2.5,
+    <div style={{ padding:`${S[4]}px ${S[4]}px 0` }}>
+      <div style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
                     textTransform:'uppercase', color:sectionCol,
-                    marginBottom:10, paddingLeft:4 }}>Днес</div>
-      <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                    marginBottom:S[3] - 2, paddingLeft:S[1] }}>Днес</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:S[2] - 1 }}>
         {schedule.map((ev, i) => {
           const isPast    = i < heroIdx;
           const isCurrent = i === heroIdx;
           return (
             <div key={i} style={{
-              background: rowBg, borderRadius:14, padding:'11px 16px',
-              display:'flex', alignItems:'center', gap:12,
+              background: rowBg, borderRadius:R.md, padding:`${S[3] - 1}px ${S[4]}px`,
+              display:'flex', alignItems:'center', gap:S[3],
               boxShadow: isCurrent
                 ? (dark ? '0 4px 18px oklch(0.1 0.06 278 / 0.5)' : '0 4px 18px oklch(0.4 0.06 258 / 0.14)')
                 : (dark ? 'none' : '0 2px 8px oklch(0.4 0.05 258 / 0.06)'),
@@ -513,17 +531,17 @@ function EventList({ now, heroIdx, dark, schedule }) {
               borderLeft: isCurrent ? borderCur : '3px solid transparent',
               transition:'opacity 0.3s',
             }}>
-              <span style={{ fontSize:13, fontWeight:800,
+              <span style={{ fontSize:T.md, fontWeight:W.em,
                              color: isPast ? timePast : timeNorm,
                              minWidth:42, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
-              <span style={{ fontSize:18, lineHeight:1 }}>{ev.emoji}</span>
-              <span style={{ fontSize:14, fontWeight:700, flex:1,
+              <span style={{ fontSize:T.emojiList, lineHeight:1 }}>{ev.emoji}</span>
+              <span style={{ fontSize:T.lg, fontWeight:W.reg, flex:1,
                              color: isPast ? textPast : textNorm,
                              textDecoration: isPast ? 'line-through' : 'none',
                              textDecorationColor: dark ? 'oklch(0.4 0.04 280)' : 'oklch(0.7 0.03 258)' }}>{ev.name}</span>
               {isCurrent && (
-                <span style={{ fontSize:9, fontWeight:800, letterSpacing:1.5, textTransform:'uppercase',
-                               color:pillCol, background:pillBg, padding:'3px 7px', borderRadius:8 }}>сега</span>
+                <span style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:1.5, textTransform:'uppercase',
+                               color:pillCol, background:pillBg, padding:`${S[1] - 1}px ${S[2] - 1}px`, borderRadius:R.sm - 2 }}>сега</span>
               )}
             </div>
           );
