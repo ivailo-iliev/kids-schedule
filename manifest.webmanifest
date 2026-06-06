@@ -1,0 +1,20 @@
+{
+  "name": "Моят Ден",
+  "short_name": "Моят Ден",
+  "description": "Дневен график за детски тренировки.",
+  "lang": "bg",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#d8f3ff",
+  "theme_color": "#d8f3ff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

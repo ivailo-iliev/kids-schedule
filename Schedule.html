@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Моят Ден</title>
+  <meta name="theme-color" content="#d8f3ff">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
@@ -40,43 +43,6 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 /* ── Schedule data ── */
 const ICE_LIST  = [{ emoji:'⛸️', label:'Кънки' }, { emoji:'🪢', label:'Ластик' }, { emoji:'💧', label:'Вода' }];
 const SUHA_LIST = [{ emoji:'🎒', label:'Чанта' }, { emoji:'🌀', label:'Постелка' }, { emoji:'💧', label:'Вода' }];
-
-const DEFAULT_SCHEDULE = [
-  { time: '6:30',  name: 'Добро утро',     emoji: '🌅', location: null,
-    pageBg:'oklch(0.96 0.04 62)',  cardFrom:'oklch(0.93 0.07 60)',  cardTo:'oklch(0.98 0.02 75)',
-    checklist: [{ emoji:'🪥', label:'Зъби' }, { emoji:'👕', label:'Дрехи' }, { emoji:'🪮', label:'Коса' }, { emoji:'👟', label:'Обуване' }] },
-  { time: '7:30',  name: 'Лед с Албена',   emoji: '⛸️', location: 'Ледена пързалка',
-    pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
-    checklist: ICE_LIST },
-  { time: '8:45',  name: 'Закуска',         emoji: '🥐', location: null,
-    pageBg:'oklch(0.97 0.03 78)',  cardFrom:'oklch(0.94 0.06 75)',  cardTo:'oklch(0.99 0.01 88)',
-    checklist: [] },
-  { time: '10:30', name: 'Лед със Стоян',  emoji: '⛸️', location: 'Ледена пързалка',
-    pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
-    checklist: ICE_LIST },
-  { time: '11:45', name: 'Суха със Стоян', emoji: '🏃🏼‍♀️', location: null,
-    pageBg:'oklch(0.95 0.04 50)',  cardFrom:'oklch(0.91 0.08 47)',  cardTo:'oklch(0.97 0.02 60)',
-    checklist: SUHA_LIST },
-  { time: '13:00', name: 'Обяд',            emoji: '🍝', location: null,
-    pageBg:'oklch(0.96 0.04 44)',  cardFrom:'oklch(0.92 0.08 42)',  cardTo:'oklch(0.98 0.02 55)',
-    checklist: [] },
-  { time: '15:00', name: 'Лед с Андрей',   emoji: '⛸️', location: 'Ледена пързалка',
-    pageBg:'oklch(0.93 0.04 238)', cardFrom:'oklch(0.89 0.07 240)', cardTo:'oklch(0.96 0.03 228)',
-    checklist: ICE_LIST },
-  { time: '16:30', name: 'Следобедна закуска', emoji: '🍦', location: null,
-    pageBg:'oklch(0.95 0.05 68)',  cardFrom:'oklch(0.91 0.09 65)',  cardTo:'oklch(0.97 0.03 78)',
-    checklist: [] },
-  { time: '17:00', name: 'Суха със Стоян', emoji: '🏃🏼‍♀️', location: null,
-    pageBg:'oklch(0.95 0.04 50)',  cardFrom:'oklch(0.91 0.08 47)',  cardTo:'oklch(0.97 0.02 60)',
-    checklist: SUHA_LIST },
-  { time: '19:30', name: 'Вечеря',          emoji: '🥗', location: null,
-    pageBg:'oklch(0.95 0.04 148)', cardFrom:'oklch(0.91 0.08 145)', cardTo:'oklch(0.97 0.02 155)',
-    checklist: [] },
-  { time: '21:00', name: 'Лека нощ',        emoji: '🌙', location: null,
-    pageBg:'oklch(0.16 0.06 278)', cardFrom:'oklch(0.20 0.09 280)', cardTo:'oklch(0.28 0.07 270)',
-    dark: true,
-    checklist: [{ emoji:'🪥', label:'Зъби' }, { emoji:'🚿', label:'Душ' }, { emoji:'🪮', label:'Коса' }, { emoji:'👕', label:'Пижама' }] },
-];
 
 /* ── Themes (accent color only) ── */
 const THEMES = {
@@ -193,14 +159,13 @@ const pad = n => String(Math.abs(n)).padStart(2,'0');
 const BG_DAYS = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
 
 const CALENDAR_ENDPOINT = '/api/google-calendar';
+const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v1';
+
 
 function cloneChecklist(items = []) {
   return items.map(item => ({ ...item }));
 }
 
-function cloneSchedule(schedule) {
-  return schedule.map(ev => ({ ...ev, checklist: cloneChecklist(ev.checklist || []) }));
-}
 
 function eventFromTemplate(kind, overrides = {}) {
   const template = TEMPLATE_BY_KIND[kind] || TEMPLATE_BY_KIND.default;
@@ -241,6 +206,41 @@ function formatTimeInZone(date, timeZone) {
   }).format(date);
 }
 
+
+function formatDateInZone(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function isScheduleCacheCurrent(cache, now = new Date()) {
+  if (!cache?.date || !cache?.timeZone || !Array.isArray(cache?.schedule)) return false;
+  return cache.date === formatDateInZone(now, cache.timeZone);
+}
+
+function readCachedSchedule() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(SCHEDULE_CACHE_KEY) || 'null');
+    return isScheduleCacheCurrent(cache) ? cache : null;
+  } catch (error) {
+    console.warn('Saved calendar schedule could not be read.', error);
+    return null;
+  }
+}
+
+function saveCachedSchedule(cache) {
+  try {
+    localStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify(cache));
+  } catch (error) {
+    console.warn('Calendar schedule could not be saved for offline use.', error);
+  }
+}
+
 function normalizeText(value = '') {
   return String(value).toLowerCase();
 }
@@ -279,10 +279,6 @@ function calendarEventsToSchedule(events, timeZone) {
       };
     })
     .sort((a, b) => toSec(a.time) - toSec(b.time));
-}
-
-function getScheduleTemplateFallback() {
-  return cloneSchedule(DEFAULT_SCHEDULE);
 }
 
 /* Returns index of current active (or next upcoming) event.
@@ -592,11 +588,37 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
   );
 });
 
+
+const EmptySchedule = memo(function EmptySchedule({ now, status, message }) {
+  const isLoading = status === 'loading';
+  const title = isLoading ? 'Зареждам графика…' : 'Няма график за днес';
+  const detail = message || (isLoading ? 'Свързвам се с календара.' : 'Свържи се с интернет, за да изтегля събитията.');
+
+  return (
+    <div style={{
+      width:'100%', maxWidth:390, minHeight:'100dvh',
+      background:'oklch(0.93 0.04 238)',
+      display:'flex', flexDirection:'column', paddingBottom:40,
+    }}>
+      <StatusBar now={now} dark={false} />
+      <main style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:S[5] }}>
+        <section style={{
+          width:'100%', borderRadius:R.xxl, padding:S[6], textAlign:'center',
+          background:'linear-gradient(135deg, oklch(0.89 0.07 240), oklch(0.96 0.03 228))',
+          boxShadow:'0 24px 60px oklch(0.35 0.08 240 / 0.18)',
+          color:'oklch(0.24 0.07 258)',
+        }}>
+          <div style={{ fontSize:64, lineHeight:1, marginBottom:S[4] }}>⛸️</div>
+          <h1 style={{ fontSize:T.xl, fontWeight:W.dis, letterSpacing:'-0.4px', marginBottom:S[2] }}>{title}</h1>
+          <p style={{ fontSize:T.md, fontWeight:W.reg, color:'oklch(0.40 0.06 258)', lineHeight:1.35 }}>{detail}</p>
+        </section>
+      </main>
+    </div>
+  );
+});
+
 /* ── App ── */
-function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const now = useNow();
-  const [schedule, setSchedule] = useState(() => getScheduleTemplateFallback());
+function ScheduleView({ now, schedule, t, setTweak, eventOpts, debugIdx }) {
   /* Per-event checklist state, keyed by event index */
   const [checkStates, setCheckStates] = useState({});
 
@@ -604,46 +626,9 @@ function App() {
   const [completed, setCompleted] = useState(new Set());
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadCalendarSchedule() {
-      try {
-        const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
-        const data = await response.json();
-        const timeZone = data.timeZone || 'Europe/Sofia';
-        const mapped = calendarEventsToSchedule(data.events || [], timeZone);
-        if (mapped.length > 0) {
-          setSchedule(mapped);
-        }
-      } catch (error) {
-        if (error.name === 'AbortError') return;
-        console.warn('Using bundled schedule because Google Calendar could not be loaded.', error);
-      }
-    }
-
-    loadCalendarSchedule();
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
     setCompleted(new Set());
     setCheckStates({});
   }, [schedule]);
-
-  // Debug overrides from Tweaks
-  const eventOpts = useMemo(() => ['авто', ...schedule.map(ev => `${ev.time} ${ev.emoji}`)], [schedule]);
-  const debugIdx = useMemo(() => (
-    t.debugEvent !== 'авто'
-      ? schedule.findIndex(ev => `${ev.time} ${ev.emoji}` === t.debugEvent)
-      : -1
-  ), [schedule, t.debugEvent]);
-
-  useEffect(() => {
-    if (t.debugEvent !== 'авто' && !eventOpts.includes(t.debugEvent)) {
-      setTweak('debugEvent', 'авто');
-    }
-  }, [eventOpts, t.debugEvent, setTweak]);
 
   const heroIdx = debugIdx >= 0 ? debugIdx : findHeroIdx(now, completed, schedule);
 
@@ -710,6 +695,97 @@ function App() {
       </TweaksPanel>
     </div>
   );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const now = useNow();
+  const [schedule, setSchedule] = useState(() => readCachedSchedule()?.schedule || []);
+  const [scheduleStatus, setScheduleStatus] = useState(() => (schedule.length ? 'offline-cache' : 'loading'));
+  const [scheduleMessage, setScheduleMessage] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCalendarSchedule() {
+      setScheduleStatus(prev => (prev === 'offline-cache' ? prev : 'loading'));
+      try {
+        const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
+        const data = await response.json();
+        const timeZone = data.timeZone || 'Europe/Sofia';
+        const mapped = calendarEventsToSchedule(data.events || [], timeZone);
+        const cache = { date: data.date, timeZone, schedule: mapped, savedAt: new Date().toISOString() };
+
+        if (data.ok && data.date === formatDateInZone(new Date(), timeZone)) {
+          saveCachedSchedule(cache);
+          setSchedule(mapped);
+          setScheduleStatus(mapped.length ? 'online' : 'empty');
+          setScheduleMessage(mapped.length ? '' : 'Няма събития за днес.');
+        } else {
+          const currentCache = readCachedSchedule();
+          setSchedule(currentCache?.schedule || []);
+          setScheduleStatus(currentCache ? 'offline-cache' : 'empty');
+          setScheduleMessage(data.message || 'Календарът не е настроен.');
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        const currentCache = readCachedSchedule();
+        if (currentCache) {
+          setSchedule(currentCache.schedule);
+          setScheduleStatus('offline-cache');
+          setScheduleMessage('Показвам последно изтегления график за днес.');
+        } else {
+          setSchedule([]);
+          setScheduleStatus('offline-empty');
+          setScheduleMessage('Няма запазен график за днешната дата.');
+        }
+        console.warn('Calendar schedule could not be loaded.', error);
+      }
+    }
+
+    loadCalendarSchedule();
+    return () => controller.abort();
+  }, []);
+
+  // Debug overrides from Tweaks
+  const eventOpts = useMemo(() => ['авто', ...schedule.map(ev => `${ev.time} ${ev.emoji}`)], [schedule]);
+  const debugIdx = useMemo(() => (
+    t.debugEvent !== 'авто'
+      ? schedule.findIndex(ev => `${ev.time} ${ev.emoji}` === t.debugEvent)
+      : -1
+  ), [schedule, t.debugEvent]);
+
+  useEffect(() => {
+    if (t.debugEvent !== 'авто' && !eventOpts.includes(t.debugEvent)) {
+      setTweak('debugEvent', 'авто');
+    }
+  }, [eventOpts, t.debugEvent, setTweak]);
+
+  if (schedule.length === 0) {
+    return (
+      <>
+        <EmptySchedule now={now} status={scheduleStatus} message={scheduleMessage} />
+        <TweaksPanel>
+          <TweakSection label="Акцент" />
+          <TweakSelect label="Цвят" value={t.accent}
+            options={['ice','aurora','sunset']}
+            onChange={v => setTweak('accent', v)} />
+        </TweaksPanel>
+      </>
+    );
+  }
+
+  return <ScheduleView now={now} schedule={schedule} t={t} setTweak={setTweak} eventOpts={eventOpts} debugIdx={debugIdx} />;
+}
+
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(error => {
+      console.warn('Service worker registration failed.', error);
+    });
+  });
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
