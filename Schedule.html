@@ -218,19 +218,28 @@ function formatDateInZone(date, timeZone) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function isScheduleCacheUsable(cache) {
+  return !!cache?.date && !!cache?.timeZone && Array.isArray(cache?.schedule);
+}
+
 function isScheduleCacheCurrent(cache, now = new Date()) {
-  if (!cache?.date || !cache?.timeZone || !Array.isArray(cache?.schedule)) return false;
+  if (!isScheduleCacheUsable(cache)) return false;
   return cache.date === formatDateInZone(now, cache.timeZone);
 }
 
-function readCachedSchedule() {
+function readStoredSchedule() {
   try {
     const cache = JSON.parse(localStorage.getItem(SCHEDULE_CACHE_KEY) || 'null');
-    return isScheduleCacheCurrent(cache) ? cache : null;
+    return isScheduleCacheUsable(cache) ? cache : null;
   } catch (error) {
     console.warn('Saved calendar schedule could not be read.', error);
     return null;
   }
+}
+
+function readCachedSchedule() {
+  const cache = readStoredSchedule();
+  return isScheduleCacheCurrent(cache) ? cache : null;
 }
 
 function saveCachedSchedule(cache) {
@@ -418,6 +427,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
   const started = effectiveDiff < 0;
   const accent  = (THEMES[theme] || THEMES.ice).accent;
   const isLast  = heroIdx === schedule.length - 1;
+  const canComplete = !isLast && diff <= 0;
   const dark    = !!ev.dark;
 
   const absSec  = Math.abs(Math.round(effectiveDiff));
@@ -499,7 +509,7 @@ function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTime
         )}
 
         {/* ④ Готово */}
-        {!isLast && <DoneButton onComplete={onComplete} accent={accent} />}
+        {canComplete && <DoneButton onComplete={onComplete} accent={accent} />}
       </div>
     </div>
   );
@@ -542,9 +552,6 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
   const timeNorm   = dark ? 'oklch(0.62 0.05 280)' : 'oklch(0.55 0.05 258)';
   const borderCur  = dark ? '3px solid oklch(0.62 0.12 280)' : '3px solid oklch(0.55 0.16 350)';
   const sectionCol = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.52 0.05 258)';
-  const pillBg     = dark ? 'oklch(0.32 0.09 278)' : 'oklch(0.94 0.06 350)';
-  const pillCol    = dark ? 'oklch(0.72 0.10 280)' : 'oklch(0.48 0.16 350)';
-
   return (
     <div style={{ padding:`${S[3]}px ${S[3]}px 0` }}>
       <div style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:2.5,
@@ -565,15 +572,9 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
               borderLeft: isCurrent ? borderCur : '3px solid transparent',
               transition:'opacity 0.3s',
             }}>
-              {isCurrent ? (
-                <span style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:1, textTransform:'uppercase',
-                               color:pillCol, background:pillBg, padding:`${S[1]}px ${S[2]}px`, borderRadius:R.sm,
-                               minWidth:50, textAlign:'center', flexShrink:0 }}>сега</span>
-              ) : (
-                <span style={{ fontSize:T.md, fontWeight:W.em,
-                               color: isPast ? timePast : timeNorm,
-                               minWidth:50, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
-              )}
+              <span style={{ fontSize:T.md, fontWeight:W.em,
+                             color: isPast ? timePast : timeNorm,
+                             minWidth:50, fontVariantNumeric:'tabular-nums' }}>{ev.time}</span>
               <span style={{ fontSize:T.emojiList, lineHeight:1 }}>{ev.emoji}</span>
               <span style={{ fontSize:T.lg, fontWeight:W.reg, flex:1, minWidth:0,
                              color: isPast ? textPast : textNorm,
@@ -700,15 +701,15 @@ function ScheduleView({ now, schedule, t, setTweak, eventOpts, debugIdx }) {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const now = useNow();
-  const [schedule, setSchedule] = useState(() => readCachedSchedule()?.schedule || []);
-  const [scheduleStatus, setScheduleStatus] = useState(() => (schedule.length ? 'offline-cache' : 'loading'));
+  const [schedule, setSchedule] = useState(() => readStoredSchedule()?.schedule || []);
+  const [scheduleStatus, setScheduleStatus] = useState(() => (schedule.length ? 'local-cache' : 'loading'));
   const [scheduleMessage, setScheduleMessage] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function loadCalendarSchedule() {
-      setScheduleStatus(prev => (prev === 'offline-cache' ? prev : 'loading'));
+      setScheduleStatus(prev => (prev === 'local-cache' || prev === 'offline-cache' ? prev : 'loading'));
       try {
         const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal });
         if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
