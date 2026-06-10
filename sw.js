@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'kids-schedule-v2';
+const CACHE_VERSION = 'kids-schedule-v3';
 const APP_SHELL = [
   '/',
   '/Schedule.html',
@@ -35,10 +35,10 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-async function networkFirst(request) {
+async function networkFirst(request, options = {}) {
   const cache = await caches.open(CACHE_VERSION);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, options);
     if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch (error) {
@@ -73,7 +73,7 @@ self.addEventListener('fetch', event => {
   }
 
   if (url.pathname === CALENDAR_PATH) {
-    event.respondWith(networkFirst(event.request));
+    event.respondWith(networkFirst(event.request, { cache: 'no-store' }));
     return;
   }
 

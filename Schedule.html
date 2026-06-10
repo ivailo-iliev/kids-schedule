@@ -160,6 +160,8 @@ const BG_DAYS = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
 
 const CALENDAR_ENDPOINT = '/api/google-calendar';
 const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v1';
+const DEFAULT_CALENDAR_TIME_ZONE = 'Europe/Sofia';
+
 
 
 function cloneChecklist(items = []) {
@@ -237,12 +239,14 @@ function readStoredSchedule() {
   }
 }
 
-function readCachedSchedule() {
+function readCachedSchedule(now = new Date()) {
   const cache = readStoredSchedule();
-  return isScheduleCacheCurrent(cache) ? cache : null;
+  return isScheduleCacheCurrent(cache, now) ? cache : null;
 }
 
 function saveCachedSchedule(cache) {
+  if (!isScheduleCacheCurrent(cache)) return;
+
   try {
     localStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify(cache));
   } catch (error) {
@@ -701,9 +705,10 @@ function ScheduleView({ now, schedule, t, setTweak, eventOpts, debugIdx }) {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const now = useNow();
-  const [schedule, setSchedule] = useState(() => readStoredSchedule()?.schedule || []);
-  const [scheduleStatus, setScheduleStatus] = useState(() => (schedule.length ? 'local-cache' : 'loading'));
-  const [scheduleMessage, setScheduleMessage] = useState('');
+  const [initialCache] = useState(() => readCachedSchedule());
+  const [schedule, setSchedule] = useState(() => initialCache?.schedule || []);
+  const [scheduleStatus, setScheduleStatus] = useState(() => (initialCache?.schedule?.length ? 'offline-cache' : 'loading'));
+  const [scheduleMessage, setScheduleMessage] = useState(() => (initialCache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : ''));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -711,10 +716,10 @@ function App() {
     async function loadCalendarSchedule() {
       setScheduleStatus(prev => (prev === 'local-cache' || prev === 'offline-cache' ? prev : 'loading'));
       try {
-        const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal });
+        const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
         const data = await response.json();
-        const timeZone = data.timeZone || 'Europe/Sofia';
+        const timeZone = data.timeZone || initialCache?.timeZone || DEFAULT_CALENDAR_TIME_ZONE;
         const mapped = calendarEventsToSchedule(data.events || [], timeZone);
         const cache = { date: data.date, timeZone, schedule: mapped, savedAt: new Date().toISOString() };
 
