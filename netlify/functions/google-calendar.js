@@ -4,6 +4,10 @@ const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3/calendars';
 const DEFAULT_TIME_ZONE = process.env.GOOGLE_CALENDAR_TIME_ZONE || process.env.GOOGLE_TIME_ZONE || 'Europe/Sofia';
+const JSON_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'no-store, max-age=0',
+};
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -175,7 +179,7 @@ exports.handler = async function handler(event) {
   } catch (error) {
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         ok: false,
         configured: false,
@@ -190,7 +194,7 @@ exports.handler = async function handler(event) {
   if (!calendarId) {
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         ok: false,
         configured: false,
@@ -205,7 +209,7 @@ exports.handler = async function handler(event) {
   if (!serviceAccount?.client_email || !serviceAccount?.private_key) {
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         ok: false,
         configured: false,
@@ -231,7 +235,7 @@ exports.handler = async function handler(event) {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         ok: true,
         configured: true,
@@ -245,7 +249,7 @@ exports.handler = async function handler(event) {
   } catch (error) {
     return {
       statusCode: 502,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         ok: false,
         configured: true,
