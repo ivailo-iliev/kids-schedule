@@ -23,11 +23,28 @@ A mobile-first, installable schedule app for a child athlete. It reads today’s
 - **Per-event colours** — page and hero card background shift for each activity type
 - **Dark mode** for Лека нощ (bedtime) to reduce eye strain
 - **Google Calendar sync** through Netlify Functions; credentials are required for live events
+- **Group picker** — label events in their description and show one group's schedule at a time
 - **Offline support** through PWA assets and the last downloaded event list, but only when that saved list matches the current date
 
 ## Schedule source
 
 The app no longer includes a built-in hardcoded day of events. Events come from Google Calendar. If the calendar cannot be reached, the browser checks its saved calendar cache and displays it only when the saved `date` matches today in the calendar time zone. If there is no current-date cache, the app shows an empty-state message instead of stale events.
+
+## Groups
+
+Add a line to a Google Calendar event's **description** using either English or Bulgarian:
+
+```text
+Group: Beginners
+```
+
+```text
+Група: Напреднали
+```
+
+The app collects those labels into the **Група** picker. Choose a label to show only that group's events, or choose **Всички** to restore the full schedule. Events without a group label appear under **Общи**. The last selection is remembered on the device.
+
+Calendar integrations can alternatively provide the group in `extendedProperties.private.group`; that value takes precedence over the description label.
 
 ## Checklists
 

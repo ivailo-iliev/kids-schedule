@@ -160,7 +160,10 @@ const BG_DAYS = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
 
 const CALENDAR_ENDPOINT = '/api/google-calendar';
 const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v1';
+const SELECTED_GROUP_KEY = 'kids-schedule.selected-group.v1';
 const DEFAULT_CALENDAR_TIME_ZONE = 'Europe/Sofia';
+const ALL_GROUPS = 'Всички';
+const DEFAULT_GROUP = 'Общи';
 
 
 
@@ -258,6 +261,16 @@ function normalizeText(value = '') {
   return String(value).toLowerCase();
 }
 
+function groupFromEvent(event) {
+  const privateGroup = event?.extendedProperties?.private?.group;
+  if (typeof privateGroup === 'string' && privateGroup.trim()) {
+    return privateGroup.trim();
+  }
+
+  const groupLine = String(event?.description || '').match(/^\s*(?:group|група)\s*:\s*(.+?)\s*$/im);
+  return groupLine?.[1]?.trim() || DEFAULT_GROUP;
+}
+
 function inferKind(summary = '', description = '', location = '') {
   const text = `${summary} ${description} ${location}`.toLowerCase();
   if (text.includes('лека нощ') || text.includes('good night') || text.includes('bedtime')) return 'bedtime';
@@ -288,6 +301,7 @@ function calendarEventsToSchedule(events, timeZone) {
       const styled = styleFromEvent(ev);
       return {
         time: formatTimeInZone(startDate, timeZone),
+        group: groupFromEvent(ev),
         ...styled,
       };
     })
@@ -593,6 +607,40 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
   );
 });
 
+const GroupPicker = memo(function GroupPicker({ groups, selectedGroup, onSelect, dark = false }) {
+  const options = [ALL_GROUPS, ...groups];
+  const labelColor = dark ? 'oklch(0.62 0.05 280)' : 'oklch(0.45 0.06 258)';
+
+  return (
+    <section aria-label="Филтър по група" style={{ padding:`${S[2]}px ${S[3]}px 0` }}>
+      <div style={{ fontSize:T.xs, fontWeight:W.em, letterSpacing:2.2,
+                    textTransform:'uppercase', color:labelColor,
+                    marginBottom:S[2], paddingLeft:S[1] }}>Група</div>
+      <div role="group" aria-label="Избери група" style={{
+        display:'flex', gap:S[2], overflowX:'auto', padding:`2px ${S[1]}px ${S[2]}px`,
+        scrollbarWidth:'none',
+      }}>
+        {options.map(group => {
+          const selected = group === selectedGroup;
+          return (
+            <button key={group} type="button" aria-pressed={selected}
+              onClick={() => onSelect(group)} style={{
+                flexShrink:0, borderRadius:999, padding:`${S[2]}px ${S[3]}px`,
+                border: selected ? '2px solid oklch(0.50 0.18 350)' : '2px solid transparent',
+                background: selected
+                  ? (dark ? 'oklch(0.32 0.10 310)' : 'oklch(0.96 0.05 350)')
+                  : (dark ? 'oklch(1 0 0 / 0.10)' : 'oklch(1 0 0 / 0.75)'),
+                color: dark ? 'oklch(0.92 0.03 280)' : 'oklch(0.25 0.07 260)',
+                fontFamily:'inherit', fontSize:T.sm, fontWeight:W.em, cursor:'pointer',
+                boxShadow: selected ? '0 3px 10px oklch(0.4 0.12 350 / 0.12)' : 'none',
+              }}>{group}</button>
+          );
+        })}
+      </div>
+    </section>
+  );
+});
+
 
 const EmptySchedule = memo(function EmptySchedule({ now, status, message }) {
   const isLoading = status === 'loading';
@@ -623,7 +671,7 @@ const EmptySchedule = memo(function EmptySchedule({ now, status, message }) {
 });
 
 /* ── App ── */
-function ScheduleView({ now, schedule, t, setTweak, eventOpts, debugIdx }) {
+function ScheduleView({ now, schedule, groups, selectedGroup, onSelectGroup, t, setTweak, eventOpts, debugIdx }) {
   /* Per-event checklist state, keyed by event index */
   const [checkStates, setCheckStates] = useState({});
 
@@ -680,6 +728,7 @@ function ScheduleView({ now, schedule, t, setTweak, eventOpts, debugIdx }) {
       paddingBottom:40,
     }}>
       <StatusBar now={now} dark={isDark} />
+      <GroupPicker groups={groups} selectedGroup={selectedGroup} onSelect={onSelectGroup} dark={isDark} />
       <HeroCard now={now} heroIdx={heroIdx} checks={heroChecks}
                 onToggle={toggleCheck} onComplete={handleComplete}
                 theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} />
@@ -709,6 +758,10 @@ function App() {
   const [schedule, setSchedule] = useState(() => initialCache?.schedule || []);
   const [scheduleStatus, setScheduleStatus] = useState(() => (initialCache?.schedule?.length ? 'offline-cache' : 'loading'));
   const [scheduleMessage, setScheduleMessage] = useState(() => (initialCache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : ''));
+  const [selectedGroup, setSelectedGroup] = useState(() => {
+    try { return localStorage.getItem(SELECTED_GROUP_KEY) || ALL_GROUPS; }
+    catch (error) { return ALL_GROUPS; }
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -754,13 +807,36 @@ function App() {
     return () => controller.abort();
   }, []);
 
+  const groups = useMemo(() => (
+    [...new Set(schedule.map(event => event.group || DEFAULT_GROUP))]
+      .sort((a, b) => a.localeCompare(b, 'bg'))
+  ), [schedule]);
+
+  const visibleSchedule = useMemo(() => (
+    selectedGroup === ALL_GROUPS
+      ? schedule
+      : schedule.filter(event => (event.group || DEFAULT_GROUP) === selectedGroup)
+  ), [schedule, selectedGroup]);
+
+  const selectGroup = useCallback(group => {
+    setSelectedGroup(group);
+    try { localStorage.setItem(SELECTED_GROUP_KEY, group); }
+    catch (error) { console.warn('Selected group could not be saved.', error); }
+  }, []);
+
+  useEffect(() => {
+    if (scheduleStatus !== 'loading' && selectedGroup !== ALL_GROUPS && !groups.includes(selectedGroup)) {
+      selectGroup(ALL_GROUPS);
+    }
+  }, [groups, scheduleStatus, selectedGroup, selectGroup]);
+
   // Debug overrides from Tweaks
-  const eventOpts = useMemo(() => ['авто', ...schedule.map(ev => `${ev.time} ${ev.emoji}`)], [schedule]);
+  const eventOpts = useMemo(() => ['авто', ...visibleSchedule.map(ev => `${ev.time} ${ev.emoji}`)], [visibleSchedule]);
   const debugIdx = useMemo(() => (
     t.debugEvent !== 'авто'
-      ? schedule.findIndex(ev => `${ev.time} ${ev.emoji}` === t.debugEvent)
+      ? visibleSchedule.findIndex(ev => `${ev.time} ${ev.emoji}` === t.debugEvent)
       : -1
-  ), [schedule, t.debugEvent]);
+  ), [visibleSchedule, t.debugEvent]);
 
   useEffect(() => {
     if (t.debugEvent !== 'авто' && !eventOpts.includes(t.debugEvent)) {
@@ -782,7 +858,21 @@ function App() {
     );
   }
 
-  return <ScheduleView now={now} schedule={schedule} t={t} setTweak={setTweak} eventOpts={eventOpts} debugIdx={debugIdx} />;
+  if (visibleSchedule.length === 0) {
+    return (
+      <div style={{ width:'100%', maxWidth:390, minHeight:'100dvh', background:'oklch(0.93 0.04 238)' }}>
+        <StatusBar now={now} dark={false} />
+        <GroupPicker groups={groups} selectedGroup={selectedGroup} onSelect={selectGroup} />
+        <main style={{ padding:S[5], textAlign:'center', color:'oklch(0.30 0.07 258)' }}>
+          Няма събития за група „{selectedGroup}“ днес.
+        </main>
+      </div>
+    );
+  }
+
+  return <ScheduleView now={now} schedule={visibleSchedule} groups={groups}
+    selectedGroup={selectedGroup} onSelectGroup={selectGroup}
+    t={t} setTweak={setTweak} eventOpts={eventOpts} debugIdx={debugIdx} />;
 }
 
 
