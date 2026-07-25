@@ -156,6 +156,7 @@ const TEMPLATE_BY_KIND = {
 
 /* ── Helpers ── */
 const pad = n => String(Math.abs(n)).padStart(2,'0');
+const BG_DAYS = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
 const CALENDAR_ENDPOINT = '/api/google-calendar';
 const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v2';
 const SELECTED_GROUP_KEY = 'kids-schedule.selected-group.v1';
@@ -365,11 +366,17 @@ function useNow() {
 /* ── StatusBar ── */
 const StatusBar = memo(function StatusBar({ now, dark, groups = [], selectedGroup, onSelectGroup }) {
   const col = dark ? 'oklch(0.62 0.06 280)' : 'oklch(0.42 0.06 258)';
+  const col2 = dark ? 'oklch(0.50 0.05 280)' : 'oklch(0.58 0.05 258)';
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
                   padding:`${S[4]}px ${S[4]}px ${S[1]}px`, userSelect:'none' }}>
-      <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
-        {pad(now.getHours())}:{pad(now.getMinutes())}
+      <span style={{ display:'flex', alignItems:'baseline', gap:S[2] }}>
+        <span style={{ fontSize:T.sm, fontWeight:W.reg, color:col2 }}>
+          {BG_DAYS[now.getDay()]} · {now.getDate()}.{pad(now.getMonth()+1)}
+        </span>
+        <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
+          {pad(now.getHours())}:{pad(now.getMinutes())}
+        </span>
       </span>
       {groups.length > 0 && (
         <GroupPicker groups={groups} selectedGroup={selectedGroup}
