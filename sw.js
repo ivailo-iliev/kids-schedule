@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'kids-schedule-v3';
+const CACHE_VERSION = 'kids-schedule-v4';
 const APP_SHELL = [
   '/',
   '/Schedule.html',
