@@ -42,7 +42,7 @@ Group: Beginners
 Група: Напреднали
 ```
 
-The app collects those labels into the **Група** picker. Choose a label to show only that group's events, or choose **Всички** to restore the full schedule. Events without a group label appear under **Общи**. The last selection is remembered on the device.
+The app collects those labels into the group selector at the top right. Use its left and right arrows to cycle through groups. Events without a group label remain visible with every selected group. The last selection is remembered on the device.
 
 Calendar integrations can alternatively provide the group in `extendedProperties.private.group`; that value takes precedence over the description label.
 
