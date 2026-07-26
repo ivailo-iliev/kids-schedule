@@ -51,8 +51,9 @@ Calendar integrations can alternatively provide the group in `extendedProperties
 Checklists are assigned from event templates inferred from calendar event text:
 
 - **Добро утро** — 🪥 Зъби · 👕 Дрехи · 🪮 Коса · 👟 Обуване
-- **Лед** — ⛸️ Кънки · 🪢 Ластик · 💧 Вода
-- **Суха** — 🎒 Чанта · 🌀 Постелка · 💧 Вода
+- **Лед** — ⛸️ Кънки · 💧 Вода
+- **СФП** — 🪢 Ластик · 𓀫 Въже · 💧 Вода
+- **Разтяжки** — 🌀 Постелка · 🧱 Йога блокчета · 💧 Вода (с икона на събитието 🧘 и отделна цветова тема)
 - **Лека нощ** — 🪥 Зъби · 🚿 Душ · 🪮 Коса · 👕 Пижама
 
 ## Tweaks Panel
