@@ -41,8 +41,9 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 /* ── Schedule data ── */
-const ICE_LIST  = [{ emoji:'⛸️', label:'Кънки' }, { emoji:'🪢', label:'Ластик' }, { emoji:'💧', label:'Вода' }];
-const SUHA_LIST = [{ emoji:'🎒', label:'Чанта' }, { emoji:'🌀', label:'Постелка' }, { emoji:'💧', label:'Вода' }];
+const ICE_LIST = [{ emoji:'⛸️', label:'Кънки' }, { emoji:'💧', label:'Вода' }];
+const SFP_LIST = [{ emoji:'🪢', label:'Ластик' }, { emoji:'𓀫', label:'Въже' }, { emoji:'💧', label:'Вода' }];
+const STRETCHING_LIST = [{ emoji:'🌀', label:'Постелка' }, { emoji:'🧱', label:'Йога блокчета' }, { emoji:'💧', label:'Вода' }];
 
 /* ── Themes (accent color only) ── */
 const THEMES = {
@@ -97,14 +98,23 @@ const TEMPLATE_BY_KIND = {
     cardTo:'oklch(0.98 0.02 130)',
     checklist: [],
   },
-  dry: {
+  sfp: {
     emoji: '🏃🏼‍♀️',
-    name: 'Суха',
+    name: 'СФП',
     location: null,
     pageBg:'oklch(0.95 0.04 82)',
     cardFrom:'oklch(0.90 0.07 74)',
     cardTo:'oklch(0.98 0.03 92)',
-    checklist: SUHA_LIST,
+    checklist: SFP_LIST,
+  },
+  stretching: {
+    emoji: '🧘',
+    name: 'Разтяжки',
+    location: null,
+    pageBg:'oklch(0.94 0.05 185)',
+    cardFrom:'oklch(0.87 0.08 178)',
+    cardTo:'oklch(0.97 0.03 195)',
+    checklist: STRETCHING_LIST,
   },
   lunch: {
     emoji: '🍝',
@@ -273,7 +283,8 @@ function inferKind(summary = '', description = '', location = '') {
   if (text.includes('обяд') || text.includes('lunch')) return 'lunch';
   if (text.includes('вечеря') || text.includes('dinner')) return 'dinner';
   if (text.includes('закуска') || text.includes('breakfast')) return 'breakfast';
-  if (/суха|сфп|офп|разтяжк|off[- ]?ice|dry|gym|strength|stretch/.test(text)) return 'dry';
+  if (/разтяжк|stretch/.test(text)) return 'stretching';
+  if (/суха|сфп|офп|off[- ]?ice|dry|gym|strength/.test(text)) return 'sfp';
   if (text.includes('лед') || text.includes('ice') || text.includes('skate') || text.includes('⛸')) return 'ice';
   return 'default';
 }
