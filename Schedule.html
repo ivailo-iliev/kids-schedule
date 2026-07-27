@@ -265,14 +265,25 @@ function normalizeText(value = '') {
   return String(value).toLowerCase();
 }
 
-function groupFromEvent(event) {
+function parseGroups(value) {
+  if (typeof value !== 'string') return [];
+  return [...new Set(value.split(',').map(group => group.trim()).filter(Boolean))];
+}
+
+function groupsFromEvent(event) {
   const privateGroup = event?.extendedProperties?.private?.group;
   if (typeof privateGroup === 'string' && privateGroup.trim()) {
-    return privateGroup.trim();
+    return parseGroups(privateGroup);
   }
 
   const groupLine = String(event?.description || '').match(/^\s*(?:group|група)\s*:\s*(.+?)\s*$/im);
-  return groupLine?.[1]?.trim() || null;
+  return parseGroups(groupLine?.[1]);
+}
+
+function eventGroups(event) {
+  if (Array.isArray(event?.groups)) return event.groups;
+  // Keep schedules cached by versions before multi-group support working offline.
+  return event?.group ? [event.group] : [];
 }
 
 function inferKind(summary = '', description = '', location = '') {
@@ -306,7 +317,7 @@ function calendarEventsToSchedule(events, timeZone) {
       const styled = styleFromEvent(ev);
       return {
         time: formatTimeInZone(startDate, timeZone),
-        group: groupFromEvent(ev),
+        groups: groupsFromEvent(ev),
         ...styled,
       };
     })
@@ -805,14 +816,17 @@ function App() {
   }, []);
 
   const groups = useMemo(() => (
-    [...new Set(schedule.map(event => event.group).filter(Boolean))]
+    [...new Set(schedule.flatMap(eventGroups))]
       .sort((a, b) => a.localeCompare(b, 'bg'))
   ), [schedule]);
 
   const activeGroup = groups.includes(selectedGroup) ? selectedGroup : (groups[0] || '');
 
   const visibleSchedule = useMemo(() => (
-    schedule.filter(event => !event.group || event.group === activeGroup)
+    schedule.filter(event => {
+      const assignedGroups = eventGroups(event);
+      return assignedGroups.length === 0 || assignedGroups.includes(activeGroup);
+    })
   ), [schedule, activeGroup]);
 
   const selectGroup = useCallback(group => {
