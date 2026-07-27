@@ -38,13 +38,19 @@ Add a line to a Google Calendar event's **description** using either English or 
 Group: Beginners
 ```
 
+To show the same event in more than one group's schedule, separate the group names with commas:
+
+```text
+Group: 4,5
+```
+
 ```text
 Група: Напреднали
 ```
 
-The app collects those labels into the group selector at the top right. Use its left and right arrows to cycle through groups. Events without a group label remain visible with every selected group. The last selection is remembered on the device.
+The app trims each comma-separated group name and collects the labels into the group selector at the top right. Use its left and right arrows to cycle through groups. An event assigned to multiple groups appears in each of their schedules. Events without a group label remain visible with every selected group. The last selection is remembered on the device.
 
-Calendar integrations can alternatively provide the group in `extendedProperties.private.group`; that value takes precedence over the description label.
+Calendar integrations can alternatively provide one or more comma-separated groups in `extendedProperties.private.group`; that value takes precedence over the description label.
 
 ## Checklists
 
