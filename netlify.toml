@@ -11,3 +11,13 @@ status = 200
 from = "/api/google-calendar"
 to = "/.netlify/functions/google-calendar"
 status = 200
+
+[[headers]]
+for = "/sw.js"
+  [headers.values]
+  Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+for = "/Schedule.html"
+  [headers.values]
+  Cache-Control = "no-cache, must-revalidate"
