@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'kids-schedule-v7';
+const CACHE_VERSION = 'kids-schedule-v8';
 const APP_SHELL = [
   '/',
   '/Schedule.html',
@@ -17,7 +17,12 @@ const CALENDAR_PATH = '/api/google-calendar';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_VERSION);
-    await cache.addAll(APP_SHELL);
+    await Promise.all(APP_SHELL.map(async asset => {
+      const request = new Request(asset, { cache: 'reload' });
+      const response = await fetch(request);
+      if (!response.ok) throw new Error(`Unable to cache ${asset}: ${response.status}`);
+      await cache.put(asset, response);
+    }));
     await Promise.allSettled(THIRD_PARTY_ASSETS.map(async asset => {
       const response = await fetch(asset, { mode: 'cors' });
       if (response.ok) await cache.put(asset, response);
