@@ -28,6 +28,8 @@ A mobile-first, installable schedule app for a child athlete. It reads today’s
 - **Automatic refresh** when the app opens, returns to the foreground, reconnects, or rolls over to a new date
 - **Manual refresh** from the ↻ button, with the date of the last successful refresh shown beside it
 
+Calendar data has one in-memory snapshot. Local storage is read only during startup and written only after a successful, current-date response; refresh failures keep that same snapshot rather than reconstructing a second copy from storage. Dates, event times, countdowns, and midnight rollover all use the calendar's `Europe/Sofia` time zone. Overlapping requests are aborted, and a response is accepted only if it still belongs to today.
+
 ## Schedule source
 
 The app no longer includes a built-in hardcoded day of events. Events come from Google Calendar. If the calendar cannot be reached, the browser checks its saved calendar cache and displays it only when the saved `date` matches today. If the app remains open across midnight, it immediately hides the old schedule and requests the new date. If there is no current-date cache, the app shows an empty-state message instead of stale events.
