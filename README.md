@@ -9,7 +9,7 @@ A mobile-first, installable schedule app for a child athlete. It reads today’s
 | `Schedule.html` | The app — open this in a browser |
 | `tweaks-panel.jsx` | In-page Tweaks UI (loaded by Schedule.html) |
 | `manifest.webmanifest` | PWA manifest for install metadata and icons |
-| `sw.js` | Service worker for app-shell and calendar response caching |
+| `sw.js` | Service worker for app-shell caching and network-only calendar requests |
 | `icon.svg` | ⛸️ SVG app icon and favicon |
 | `netlify/functions/google-calendar.js` | Netlify Function that reads Google Calendar |
 | `netlify.toml` | Netlify routing for `/` and `/api/google-calendar` |
@@ -25,10 +25,12 @@ A mobile-first, installable schedule app for a child athlete. It reads today’s
 - **Google Calendar sync** through Netlify Functions; credentials are required for live events
 - **Group picker** — label events in their description and show one group's schedule at a time
 - **Offline support** through PWA assets and the last downloaded event list, but only when that saved list matches the current date
+- **Automatic refresh** when the app opens, returns to the foreground, reconnects, or rolls over to a new date
+- **Manual refresh** from the ↻ button, with the date of the last successful refresh shown beside it
 
 ## Schedule source
 
-The app no longer includes a built-in hardcoded day of events. Events come from Google Calendar. If the calendar cannot be reached, the browser checks its saved calendar cache and displays it only when the saved `date` matches today in the calendar time zone. If there is no current-date cache, the app shows an empty-state message instead of stale events.
+The app no longer includes a built-in hardcoded day of events. Events come from Google Calendar. If the calendar cannot be reached, the browser checks its saved calendar cache and displays it only when the saved `date` matches today. If the app remains open across midnight, it immediately hides the old schedule and requests the new date. If there is no current-date cache, the app shows an empty-state message instead of stale events.
 
 ## Groups
 
@@ -103,5 +105,5 @@ This integration uses a **service account**, not a public API key. That is the r
 
 - The page calls `/.netlify/functions/google-calendar` through the `/api/google-calendar` redirect.
 - If the function is configured, it loads today’s events from Google Calendar and saves that mapped schedule in the browser.
-- If the request fails while offline, the app displays the saved schedule only when its calendar `date` is today for that time zone.
+- If the request fails while offline, the app displays the saved schedule only when its calendar `date` is today.
 - If the function is not configured, fails, or has no current-date cache, the app shows an empty state rather than using bundled events.

@@ -32,7 +32,7 @@
 
 <script type="text/babel">
 
-const { useCallback, useEffect, useMemo, useState, memo } = React;
+const { useCallback, useEffect, useMemo, useRef, useState, memo } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accent": "ice",
@@ -166,7 +166,6 @@ const TEMPLATE_BY_KIND = {
 
 /* ── Helpers ── */
 const pad = n => String(Math.abs(n)).padStart(2,'0');
-const BG_DAYS = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
 const CALENDAR_ENDPOINT = '/api/google-calendar';
 const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v2';
 const SELECTED_GROUP_KEY = 'kids-schedule.selected-group.v1';
@@ -216,24 +215,23 @@ function formatTimeInZone(date, timeZone) {
 }
 
 
-function formatDateInZone(date, timeZone) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+function todayDate(date = new Date()) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function formatRefreshDate(date) {
+  if (!date) return '';
+  const [, month, day] = date.split('-');
+  return `${day}.${month}`;
 }
 
 function isScheduleCacheUsable(cache) {
-  return !!cache?.date && !!cache?.timeZone && Array.isArray(cache?.schedule);
+  return !!cache?.date && Array.isArray(cache?.schedule);
 }
 
 function isScheduleCacheCurrent(cache, now = new Date()) {
   if (!isScheduleCacheUsable(cache)) return false;
-  return cache.date === formatDateInZone(now, cache.timeZone);
+  return cache.date === todayDate(now);
 }
 
 function readStoredSchedule() {
@@ -386,18 +384,22 @@ function useNow() {
 }
 
 /* ── StatusBar ── */
-const StatusBar = memo(function StatusBar({ now, dark, groups = [], selectedGroup, onSelectGroup }) {
+const StatusBar = memo(function StatusBar({ refreshDate, refreshing, onRefresh, dark, groups = [], selectedGroup, onSelectGroup }) {
   const col = dark ? 'oklch(0.62 0.06 280)' : 'oklch(0.42 0.06 258)';
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
                   padding:`${S[4]}px ${S[4]}px ${S[1]}px`, userSelect:'none' }}>
-      <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
-        {BG_DAYS[now.getDay()]} · {now.getDate()}.{pad(now.getMonth()+1)} · {pad(now.getHours())}:{pad(now.getMinutes())}
-      </span>
-      {groups.length > 0 && (
-        <GroupPicker groups={groups} selectedGroup={selectedGroup}
-          onSelect={onSelectGroup} dark={dark} />
-      )}
+      <div style={{ display:'flex', alignItems:'center', gap:S[2] }}>
+        <span style={{ fontSize:T.md, fontWeight:W.dis, color:col, letterSpacing:'-0.3px' }}>
+          {formatRefreshDate(refreshDate)}
+        </span>
+        <button type="button" aria-label="Обнови" onClick={onRefresh} disabled={refreshing}
+          style={{ border:'none', background:'transparent', color:col, padding:S[1], fontFamily:'inherit',
+                   fontSize:T.xl, fontWeight:W.dis, lineHeight:1, cursor:refreshing ? 'wait' : 'pointer',
+                   opacity:refreshing ? 0.5 : 1 }}>{'↻'}</button>
+      </div>
+      {groups.length > 0 && <GroupPicker groups={groups} selectedGroup={selectedGroup}
+        onSelect={onSelectGroup} dark={dark} />}
     </div>
   );
 });
@@ -650,7 +652,7 @@ const GroupPicker = memo(function GroupPicker({ groups, selectedGroup, onSelect,
 });
 
 
-const EmptySchedule = memo(function EmptySchedule({ now, status, message }) {
+const EmptySchedule = memo(function EmptySchedule({ refreshDate, refreshing, onRefresh, status, message }) {
   const isLoading = status === 'loading';
   const title = isLoading ? 'Зареждам графика…' : 'Няма график за днес';
   const detail = message || (isLoading ? 'Свързвам се с календара.' : 'Свържи се с интернет, за да изтегля събитията.');
@@ -661,7 +663,7 @@ const EmptySchedule = memo(function EmptySchedule({ now, status, message }) {
       background:'oklch(0.93 0.04 238)',
       display:'flex', flexDirection:'column', paddingBottom:40,
     }}>
-      <StatusBar now={now} dark={false} />
+      <StatusBar refreshDate={refreshDate} refreshing={refreshing} onRefresh={onRefresh} dark={false} />
       <main style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:S[5] }}>
         <section style={{
           width:'100%', borderRadius:R.xxl, padding:S[6], textAlign:'center',
@@ -679,7 +681,7 @@ const EmptySchedule = memo(function EmptySchedule({ now, status, message }) {
 });
 
 /* ── App ── */
-function ScheduleView({ now, schedule, groups, selectedGroup, onSelectGroup, t, setTweak, eventOpts, debugIdx }) {
+function ScheduleView({ now, schedule, refreshDate, refreshing, onRefresh, groups, selectedGroup, onSelectGroup, t, setTweak, eventOpts, debugIdx }) {
   /* Per-event checklist state, keyed by event index */
   const [checkStates, setCheckStates] = useState({});
 
@@ -720,30 +722,42 @@ function ScheduleView({ now, schedule, groups, selectedGroup, onSelectGroup, t, 
     document.body.style.transition = 'background 0.6s ease';
     document.documentElement.style.setProperty('--grid-line',
       ev.dark
-        ? 'oklch(0.30 0.05 278 / 0.5)'
-        : 'oklch(0.88 0.03 55 / 0.35)'
-    );
-  }, [heroIdx, schedule]);
+  const [calendarState, setCalendarState] = useState(() => {
+    const cache = readCachedSchedule();
+    return {
+      cache,
+      status:cache?.schedule?.length ? 'offline-cache' : 'loading',
+      message:cache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : '',
+    };
+  });
 
-  const isDark = !!schedule[heroIdx].dark;
+        setCalendarState(prev => ({
+          ...prev,
+          status:prev.status === 'offline-cache' ? prev.status : 'loading',
+        }));
 
-  return (
-    <div style={{
-      width:'100%', maxWidth:390, minHeight:'100dvh',
-      background: schedule[heroIdx].pageBg,
-      transition:'background 0.6s ease',
-      display:'flex', flexDirection:'column',
-      paddingBottom:40,
-    }}>
-      <StatusBar now={now} dark={isDark} groups={groups}
-        selectedGroup={selectedGroup} onSelectGroup={onSelectGroup} />
-      <HeroCard now={now} heroIdx={heroIdx} checks={heroChecks}
-                onToggle={toggleCheck} onComplete={handleComplete}
-                theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} />
-      <EventList now={now} heroIdx={heroIdx} dark={isDark} schedule={schedule} />
+            setCalendarState({
+              cache,
+              status:mapped.length ? 'online' : 'empty',
+              message:mapped.length ? '' : 'Няма събития за днес.',
+            });
+          setCalendarState({
+            cache:currentCache,
+            status:currentCache ? 'offline-cache' : 'empty',
+            message:data.message || 'Календарът не е настроен.',
+          });
+          setCalendarState({
+            cache:currentCache,
+            status:currentCache ? 'offline-cache' : 'offline-empty',
+            message:currentCache
+              ? 'Показвам последно изтегления график за днес.'
+              : 'Няма запазен график за днешната дата.',
+          });
+  const calendar = calendarState.cache;
+      setCalendarState({ cache:null, status:'loading', message:'' });
 
-      <TweaksPanel>
-        <TweakSection label="Акцент" />
+          onRefresh={loadCalendarSchedule} status={calendarState.status} message={calendarState.message} />
+    navigator.serviceWorker.register('/sw.js?v=11', { updateViaCache: 'none' })
         <TweakSelect label="Цвят" value={t.accent}
           options={['ice','aurora','sunset']}
           onChange={v => setTweak('accent', v)} />
@@ -764,70 +778,113 @@ function App() {
   const now = useNow();
   const [initialCache] = useState(() => readCachedSchedule());
   const [schedule, setSchedule] = useState(() => initialCache?.schedule || []);
+  const [scheduleDate, setScheduleDate] = useState(() => initialCache?.date || '');
   const [scheduleStatus, setScheduleStatus] = useState(() => (initialCache?.schedule?.length ? 'offline-cache' : 'loading'));
   const [scheduleMessage, setScheduleMessage] = useState(() => (initialCache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : ''));
+  const [refreshing, setRefreshing] = useState(false);
+  const requestRef = useRef({ controller:null, id:0 });
   const [selectedGroup, setSelectedGroup] = useState(() => {
     try { return localStorage.getItem(SELECTED_GROUP_KEY) || ''; }
     catch (error) { return ''; }
   });
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadCalendarSchedule() {
-      setScheduleStatus(prev => (prev === 'local-cache' || prev === 'offline-cache' ? prev : 'loading'));
+  const loadCalendarSchedule = useCallback(async () => {
+      requestRef.current.controller?.abort();
+      const controller = new AbortController();
+      const requestId = requestRef.current.id + 1;
+      requestRef.current = { controller, id:requestId };
+      const requestedDate = todayDate();
+      const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+      setRefreshing(true);
+      setScheduleStatus(prev => (prev === 'offline-cache' ? prev : 'loading'));
       try {
-        const response = await fetch(CALENDAR_ENDPOINT, { signal: controller.signal, cache: 'no-store' });
+        const endpoint = `${CALENDAR_ENDPOINT}?date=${encodeURIComponent(requestedDate)}`;
+        const response = await fetch(endpoint, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
         const data = await response.json();
-        const timeZone = data.timeZone || initialCache?.timeZone || DEFAULT_CALENDAR_TIME_ZONE;
+        if (requestRef.current.id !== requestId) return;
+        const timeZone = data.timeZone || DEFAULT_CALENDAR_TIME_ZONE;
         const mapped = calendarEventsToSchedule(data.events || [], timeZone);
         const cache = { date: data.date, timeZone, schedule: mapped, savedAt: new Date().toISOString() };
 
-        if (data.ok && data.date === formatDateInZone(new Date(), timeZone)) {
+        if (data.ok && data.date === requestedDate && requestedDate === todayDate()) {
           saveCachedSchedule(cache);
           setSchedule(mapped);
+          setScheduleDate(data.date);
           setScheduleStatus(mapped.length ? 'online' : 'empty');
           setScheduleMessage(mapped.length ? '' : 'Няма събития за днес.');
         } else {
           const currentCache = readCachedSchedule();
           setSchedule(currentCache?.schedule || []);
+          setScheduleDate(currentCache?.date || '');
           setScheduleStatus(currentCache ? 'offline-cache' : 'empty');
           setScheduleMessage(data.message || 'Календарът не е настроен.');
         }
       } catch (error) {
-        if (error.name === 'AbortError') return;
+        if (requestRef.current.id !== requestId) return;
         const currentCache = readCachedSchedule();
         if (currentCache) {
           setSchedule(currentCache.schedule);
+          setScheduleDate(currentCache.date);
           setScheduleStatus('offline-cache');
           setScheduleMessage('Показвам последно изтегления график за днес.');
         } else {
           setSchedule([]);
+          setScheduleDate('');
           setScheduleStatus('offline-empty');
           setScheduleMessage('Няма запазен график за днешната дата.');
         }
-        console.warn('Calendar schedule could not be loaded.', error);
+        if (error.name !== 'AbortError') console.warn('Calendar schedule could not be loaded.', error);
+      } finally {
+        window.clearTimeout(timeoutId);
+        if (requestRef.current.id === requestId) setRefreshing(false);
       }
-    }
-
-    loadCalendarSchedule();
-    return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    loadCalendarSchedule();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadCalendarSchedule();
+    };
+    window.addEventListener('pageshow', loadCalendarSchedule);
+    window.addEventListener('online', loadCalendarSchedule);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      requestRef.current.controller?.abort();
+      requestRef.current.id += 1;
+      window.removeEventListener('pageshow', loadCalendarSchedule);
+      window.removeEventListener('online', loadCalendarSchedule);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [loadCalendarSchedule]);
+
+  const currentDate = todayDate(now);
+
+  useEffect(() => {
+    if (scheduleDate && scheduleDate !== currentDate) {
+      setSchedule([]);
+      setScheduleDate('');
+      setScheduleStatus('loading');
+      setScheduleMessage('');
+      loadCalendarSchedule();
+    }
+  }, [currentDate, scheduleDate, loadCalendarSchedule]);
+
+  const currentSchedule = scheduleDate === currentDate ? schedule : [];
+
   const groups = useMemo(() => (
-    [...new Set(schedule.flatMap(eventGroups))]
+    [...new Set(currentSchedule.flatMap(eventGroups))]
       .sort((a, b) => a.localeCompare(b, 'bg'))
-  ), [schedule]);
+  ), [currentSchedule]);
 
   const activeGroup = groups.includes(selectedGroup) ? selectedGroup : (groups[0] || '');
 
   const visibleSchedule = useMemo(() => (
-    schedule.filter(event => {
+    currentSchedule.filter(event => {
       const assignedGroups = eventGroups(event);
       return assignedGroups.length === 0 || assignedGroups.includes(activeGroup);
     })
-  ), [schedule, activeGroup]);
+  ), [currentSchedule, activeGroup]);
 
   const selectGroup = useCallback(group => {
     setSelectedGroup(group);
@@ -855,10 +912,11 @@ function App() {
     }
   }, [eventOpts, t.debugEvent, setTweak]);
 
-  if (schedule.length === 0) {
+  if (currentSchedule.length === 0) {
     return (
       <>
-        <EmptySchedule now={now} status={scheduleStatus} message={scheduleMessage} />
+        <EmptySchedule refreshDate={scheduleDate} refreshing={refreshing}
+          onRefresh={loadCalendarSchedule} status={scheduleStatus} message={scheduleMessage} />
         <TweaksPanel>
           <TweakSection label="Акцент" />
           <TweakSelect label="Цвят" value={t.accent}
@@ -869,7 +927,8 @@ function App() {
     );
   }
 
-  return <ScheduleView now={now} schedule={visibleSchedule} groups={groups}
+  return <ScheduleView now={now} schedule={visibleSchedule} refreshDate={scheduleDate}
+    refreshing={refreshing} onRefresh={loadCalendarSchedule} groups={groups}
     selectedGroup={activeGroup} onSelectGroup={selectGroup}
     t={t} setTweak={setTweak} eventOpts={eventOpts} debugIdx={debugIdx} />;
 }
@@ -884,7 +943,7 @@ if ('serviceWorker' in navigator) {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('/sw.js?v=8', { updateViaCache: 'none' })
+    navigator.serviceWorker.register('/sw.js?v=9', { updateViaCache: 'none' })
       .then(registration => registration.update())
       .catch(error => {
         console.warn('Service worker registration failed.', error);
