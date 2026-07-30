@@ -236,17 +236,29 @@ function isScheduleCacheCurrent(cache, now = new Date()) {
 
 function readStoredSchedule() {
   try {
-    const cache = JSON.parse(localStorage.getItem(SCHEDULE_CACHE_KEY) || 'null');
-    return isScheduleCacheUsable(cache) ? cache : null;
+    const stored = localStorage.getItem(SCHEDULE_CACHE_KEY);
+    if (!stored) return null;
+    const cache = JSON.parse(stored);
+    if (isScheduleCacheUsable(cache)) return cache;
+    localStorage.removeItem(SCHEDULE_CACHE_KEY);
+    return null;
   } catch (error) {
     console.warn('Saved calendar schedule could not be read.', error);
+    try { localStorage.removeItem(SCHEDULE_CACHE_KEY); }
+    catch (removeError) { console.warn('Invalid calendar schedule could not be removed.', removeError); }
     return null;
   }
 }
 
 function readCachedSchedule(now = new Date()) {
   const cache = readStoredSchedule();
-  return isScheduleCacheCurrent(cache, now) ? cache : null;
+  if (isScheduleCacheCurrent(cache, now)) return cache;
+
+  if (cache) {
+    try { localStorage.removeItem(SCHEDULE_CACHE_KEY); }
+    catch (error) { console.warn('Expired calendar schedule could not be removed.', error); }
+  }
+  return null;
 }
 
 function saveCachedSchedule(cache) {
@@ -722,42 +734,30 @@ function ScheduleView({ now, schedule, refreshDate, refreshing, onRefresh, group
     document.body.style.transition = 'background 0.6s ease';
     document.documentElement.style.setProperty('--grid-line',
       ev.dark
-  const [calendarState, setCalendarState] = useState(() => {
-    const cache = readCachedSchedule();
-    return {
-      cache,
-      status:cache?.schedule?.length ? 'offline-cache' : 'loading',
-      message:cache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : '',
-    };
-  });
+        ? 'oklch(0.30 0.05 278 / 0.5)'
+        : 'oklch(0.88 0.03 55 / 0.35)'
+    );
+  }, [heroIdx, schedule]);
 
-        setCalendarState(prev => ({
-          ...prev,
-          status:prev.status === 'offline-cache' ? prev.status : 'loading',
-        }));
+  const isDark = !!schedule[heroIdx].dark;
 
-            setCalendarState({
-              cache,
-              status:mapped.length ? 'online' : 'empty',
-              message:mapped.length ? '' : 'Няма събития за днес.',
-            });
-          setCalendarState({
-            cache:currentCache,
-            status:currentCache ? 'offline-cache' : 'empty',
-            message:data.message || 'Календарът не е настроен.',
-          });
-          setCalendarState({
-            cache:currentCache,
-            status:currentCache ? 'offline-cache' : 'offline-empty',
-            message:currentCache
-              ? 'Показвам последно изтегления график за днес.'
-              : 'Няма запазен график за днешната дата.',
-          });
-  const calendar = calendarState.cache;
-      setCalendarState({ cache:null, status:'loading', message:'' });
+  return (
+    <div style={{
+      width:'100%', maxWidth:390, minHeight:'100dvh',
+      background: schedule[heroIdx].pageBg,
+      transition:'background 0.6s ease',
+      display:'flex', flexDirection:'column',
+      paddingBottom:40,
+    }}>
+      <StatusBar refreshDate={refreshDate} refreshing={refreshing} onRefresh={onRefresh} dark={isDark} groups={groups}
+        selectedGroup={selectedGroup} onSelectGroup={onSelectGroup} />
+      <HeroCard now={now} heroIdx={heroIdx} checks={heroChecks}
+                onToggle={toggleCheck} onComplete={handleComplete}
+                theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} />
+      <EventList now={now} heroIdx={heroIdx} dark={isDark} schedule={schedule} />
 
-          onRefresh={loadCalendarSchedule} status={calendarState.status} message={calendarState.message} />
-    navigator.serviceWorker.register('/sw.js?v=11', { updateViaCache: 'none' })
+      <TweaksPanel>
+        <TweakSection label="Акцент" />
         <TweakSelect label="Цвят" value={t.accent}
           options={['ice','aurora','sunset']}
           onChange={v => setTweak('accent', v)} />
@@ -776,12 +776,15 @@ function ScheduleView({ now, schedule, refreshDate, refreshing, onRefresh, group
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const now = useNow();
-  const [initialCache] = useState(() => readCachedSchedule());
-  const [schedule, setSchedule] = useState(() => initialCache?.schedule || []);
-  const [scheduleDate, setScheduleDate] = useState(() => initialCache?.date || '');
-  const [scheduleStatus, setScheduleStatus] = useState(() => (initialCache?.schedule?.length ? 'offline-cache' : 'loading'));
-  const [scheduleMessage, setScheduleMessage] = useState(() => (initialCache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : ''));
-  const [refreshing, setRefreshing] = useState(false);
+  const [calendar, setCalendar] = useState(() => {
+    const cache = readCachedSchedule();
+    return {
+      cache,
+      status:cache?.schedule.length ? 'offline-cache' : 'loading',
+      message:cache?.schedule.length ? 'Показвам запазения график за днес, докато се обнови.' : '',
+      refreshing:false,
+    };
+  });
   const requestRef = useRef({ controller:null, id:0 });
   const [selectedGroup, setSelectedGroup] = useState(() => {
     try { return localStorage.getItem(SELECTED_GROUP_KEY) || ''; }
@@ -789,56 +792,65 @@ function App() {
   });
 
   const loadCalendarSchedule = useCallback(async () => {
-      requestRef.current.controller?.abort();
-      const controller = new AbortController();
-      const requestId = requestRef.current.id + 1;
-      requestRef.current = { controller, id:requestId };
-      const requestedDate = todayDate();
-      const timeoutId = window.setTimeout(() => controller.abort(), 15000);
-      setRefreshing(true);
-      setScheduleStatus(prev => (prev === 'offline-cache' ? prev : 'loading'));
-      try {
-        const endpoint = `${CALENDAR_ENDPOINT}?date=${encodeURIComponent(requestedDate)}`;
-        const response = await fetch(endpoint, { signal: controller.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
-        const data = await response.json();
-        if (requestRef.current.id !== requestId) return;
-        const timeZone = data.timeZone || DEFAULT_CALENDAR_TIME_ZONE;
-        const mapped = calendarEventsToSchedule(data.events || [], timeZone);
-        const cache = { date: data.date, timeZone, schedule: mapped, savedAt: new Date().toISOString() };
+    requestRef.current.controller?.abort();
+    const controller = new AbortController();
+    const requestId = requestRef.current.id + 1;
+    requestRef.current = { controller, id:requestId };
+    const requestedDate = todayDate();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
-        if (data.ok && data.date === requestedDate && requestedDate === todayDate()) {
-          saveCachedSchedule(cache);
-          setSchedule(mapped);
-          setScheduleDate(data.date);
-          setScheduleStatus(mapped.length ? 'online' : 'empty');
-          setScheduleMessage(mapped.length ? '' : 'Няма събития за днес.');
-        } else {
-          const currentCache = readCachedSchedule();
-          setSchedule(currentCache?.schedule || []);
-          setScheduleDate(currentCache?.date || '');
-          setScheduleStatus(currentCache ? 'offline-cache' : 'empty');
-          setScheduleMessage(data.message || 'Календарът не е настроен.');
-        }
-      } catch (error) {
-        if (requestRef.current.id !== requestId) return;
-        const currentCache = readCachedSchedule();
-        if (currentCache) {
-          setSchedule(currentCache.schedule);
-          setScheduleDate(currentCache.date);
-          setScheduleStatus('offline-cache');
-          setScheduleMessage('Показвам последно изтегления график за днес.');
-        } else {
-          setSchedule([]);
-          setScheduleDate('');
-          setScheduleStatus('offline-empty');
-          setScheduleMessage('Няма запазен график за днешната дата.');
-        }
-        if (error.name !== 'AbortError') console.warn('Calendar schedule could not be loaded.', error);
-      } finally {
-        window.clearTimeout(timeoutId);
-        if (requestRef.current.id === requestId) setRefreshing(false);
+    setCalendar(prev => ({
+      ...prev,
+      status:prev.cache ? prev.status : 'loading',
+      message:prev.cache ? prev.message : '',
+      refreshing:true,
+    }));
+
+    try {
+      const endpoint = `${CALENDAR_ENDPOINT}?date=${encodeURIComponent(requestedDate)}`;
+      const response = await fetch(endpoint, { signal: controller.signal, cache: 'no-store' });
+      if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
+      const data = await response.json();
+      if (requestRef.current.id !== requestId) return;
+      if (!data || typeof data !== 'object' || !Array.isArray(data.events)) {
+        throw new Error('Calendar response has an invalid shape.');
       }
+      const timeZone = data.timeZone || DEFAULT_CALENDAR_TIME_ZONE;
+      const mapped = calendarEventsToSchedule(data.events, timeZone);
+      const cache = { date: data.date, timeZone, schedule: mapped, savedAt: new Date().toISOString() };
+
+      if (data.ok === true && data.date === requestedDate && requestedDate === todayDate()) {
+        saveCachedSchedule(cache);
+        setCalendar({
+          cache,
+          status:mapped.length ? 'online' : 'empty',
+          message:mapped.length ? '' : 'Няма събития за днес.',
+          refreshing:false,
+        });
+      } else {
+        const currentCache = readCachedSchedule();
+        setCalendar({
+          cache:currentCache,
+          status:currentCache ? 'offline-cache' : 'empty',
+          message:data.message || 'Календарът не е настроен.',
+          refreshing:false,
+        });
+      }
+    } catch (error) {
+      if (requestRef.current.id !== requestId) return;
+      const currentCache = readCachedSchedule();
+      setCalendar({
+        cache:currentCache,
+        status:currentCache ? 'offline-cache' : 'offline-empty',
+        message:currentCache
+          ? 'Показвам последно изтегления график за днес.'
+          : 'Няма запазен график за днешната дата.',
+        refreshing:false,
+      });
+      if (error.name !== 'AbortError') console.warn('Calendar schedule could not be loaded.', error);
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
   }, []);
 
   useEffect(() => {
@@ -861,16 +873,13 @@ function App() {
   const currentDate = todayDate(now);
 
   useEffect(() => {
-    if (scheduleDate && scheduleDate !== currentDate) {
-      setSchedule([]);
-      setScheduleDate('');
-      setScheduleStatus('loading');
-      setScheduleMessage('');
+    if (calendar.cache && calendar.cache.date !== currentDate) {
+      setCalendar({ cache:null, status:'loading', message:'', refreshing:true });
       loadCalendarSchedule();
     }
-  }, [currentDate, scheduleDate, loadCalendarSchedule]);
+  }, [currentDate, calendar.cache, loadCalendarSchedule]);
 
-  const currentSchedule = scheduleDate === currentDate ? schedule : [];
+  const currentSchedule = calendar.cache?.date === currentDate ? calendar.cache.schedule : [];
 
   const groups = useMemo(() => (
     [...new Set(currentSchedule.flatMap(eventGroups))]
@@ -915,8 +924,8 @@ function App() {
   if (currentSchedule.length === 0) {
     return (
       <>
-        <EmptySchedule refreshDate={scheduleDate} refreshing={refreshing}
-          onRefresh={loadCalendarSchedule} status={scheduleStatus} message={scheduleMessage} />
+        <EmptySchedule refreshDate={calendar.cache?.date || ''} refreshing={calendar.refreshing}
+          onRefresh={loadCalendarSchedule} status={calendar.status} message={calendar.message} />
         <TweaksPanel>
           <TweakSection label="Акцент" />
           <TweakSelect label="Цвят" value={t.accent}
@@ -927,8 +936,8 @@ function App() {
     );
   }
 
-  return <ScheduleView now={now} schedule={visibleSchedule} refreshDate={scheduleDate}
-    refreshing={refreshing} onRefresh={loadCalendarSchedule} groups={groups}
+  return <ScheduleView now={now} schedule={visibleSchedule} refreshDate={calendar.cache.date}
+    refreshing={calendar.refreshing} onRefresh={loadCalendarSchedule} groups={groups}
     selectedGroup={activeGroup} onSelectGroup={selectGroup}
     t={t} setTweak={setTweak} eventOpts={eventOpts} debugIdx={debugIdx} />;
 }
@@ -943,7 +952,7 @@ if ('serviceWorker' in navigator) {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('/sw.js?v=9', { updateViaCache: 'none' })
+    navigator.serviceWorker.register('/sw.js?v=12', { updateViaCache: 'none' })
       .then(registration => registration.update())
       .catch(error => {
         console.warn('Service worker registration failed.', error);
