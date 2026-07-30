@@ -722,30 +722,42 @@ function ScheduleView({ now, schedule, refreshDate, refreshing, onRefresh, group
     document.body.style.transition = 'background 0.6s ease';
     document.documentElement.style.setProperty('--grid-line',
       ev.dark
-        ? 'oklch(0.30 0.05 278 / 0.5)'
-        : 'oklch(0.88 0.03 55 / 0.35)'
-    );
-  }, [heroIdx, schedule]);
+  const [calendarState, setCalendarState] = useState(() => {
+    const cache = readCachedSchedule();
+    return {
+      cache,
+      status:cache?.schedule?.length ? 'offline-cache' : 'loading',
+      message:cache?.schedule?.length ? 'Показвам запазения график за днес, докато се обнови.' : '',
+    };
+  });
 
-  const isDark = !!schedule[heroIdx].dark;
+        setCalendarState(prev => ({
+          ...prev,
+          status:prev.status === 'offline-cache' ? prev.status : 'loading',
+        }));
 
-  return (
-    <div style={{
-      width:'100%', maxWidth:390, minHeight:'100dvh',
-      background: schedule[heroIdx].pageBg,
-      transition:'background 0.6s ease',
-      display:'flex', flexDirection:'column',
-      paddingBottom:40,
-    }}>
-      <StatusBar refreshDate={refreshDate} refreshing={refreshing} onRefresh={onRefresh} dark={isDark} groups={groups}
-        selectedGroup={selectedGroup} onSelectGroup={onSelectGroup} />
-      <HeroCard now={now} heroIdx={heroIdx} checks={heroChecks}
-                onToggle={toggleCheck} onComplete={handleComplete}
-                theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} />
-      <EventList now={now} heroIdx={heroIdx} dark={isDark} schedule={schedule} />
+            setCalendarState({
+              cache,
+              status:mapped.length ? 'online' : 'empty',
+              message:mapped.length ? '' : 'Няма събития за днес.',
+            });
+          setCalendarState({
+            cache:currentCache,
+            status:currentCache ? 'offline-cache' : 'empty',
+            message:data.message || 'Календарът не е настроен.',
+          });
+          setCalendarState({
+            cache:currentCache,
+            status:currentCache ? 'offline-cache' : 'offline-empty',
+            message:currentCache
+              ? 'Показвам последно изтегления график за днес.'
+              : 'Няма запазен график за днешната дата.',
+          });
+  const calendar = calendarState.cache;
+      setCalendarState({ cache:null, status:'loading', message:'' });
 
-      <TweaksPanel>
-        <TweakSection label="Акцент" />
+          onRefresh={loadCalendarSchedule} status={calendarState.status} message={calendarState.message} />
+    navigator.serviceWorker.register('/sw.js?v=11', { updateViaCache: 'none' })
         <TweakSelect label="Цвят" value={t.accent}
           options={['ice','aurora','sunset']}
           onChange={v => setTweak('accent', v)} />
