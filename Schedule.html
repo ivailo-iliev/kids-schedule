@@ -167,7 +167,7 @@ const TEMPLATE_BY_KIND = {
 /* ── Helpers ── */
 const pad = n => String(Math.abs(n)).padStart(2,'0');
 const CALENDAR_ENDPOINT = '/api/google-calendar';
-const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v2';
+const SCHEDULE_CACHE_KEY = 'kids-schedule.calendar-cache.v3';
 const SELECTED_GROUP_KEY = 'kids-schedule.selected-group.v1';
 const DEFAULT_CALENDAR_TIME_ZONE = 'Europe/Sofia';
 function cloneChecklist(items = []) {
@@ -201,8 +201,13 @@ function toSec(timeStr) {
   const [h, m] = timeStr.split(':').map(Number);
   return h * 3600 + m * 60;
 }
-function nowSec(now) {
-  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+function nowSec(now, timeZone = DEFAULT_CALENDAR_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(now);
+  const value = type => Number(parts.find(part => part.type === type)?.value || 0);
+  return value('hour') * 3600 + value('minute') * 60 + value('second');
 }
 
 function formatTimeInZone(date, timeZone) {
@@ -215,8 +220,12 @@ function formatTimeInZone(date, timeZone) {
 }
 
 
-function todayDate(date = new Date()) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+function todayDate(date = new Date(), timeZone = DEFAULT_CALENDAR_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year:'numeric', month:'2-digit', day:'2-digit',
+  }).formatToParts(date);
+  const value = type => parts.find(part => part.type === type)?.value;
+  return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
 function formatRefreshDate(date) {
@@ -237,7 +246,6 @@ function isScheduleCacheCurrent(cache, now = new Date()) {
 function readStoredSchedule() {
   try {
     const stored = localStorage.getItem(SCHEDULE_CACHE_KEY);
-    if (!stored) return null;
     const cache = JSON.parse(stored);
     if (isScheduleCacheUsable(cache)) return cache;
     localStorage.removeItem(SCHEDULE_CACHE_KEY);
@@ -322,10 +330,11 @@ function styleFromEvent(event) {
 function calendarEventsToSchedule(events, timeZone) {
   return (events || [])
     .filter(ev => ev && ev.start?.dateTime)
-    .map(ev => {
+    .map((ev, index) => {
       const startDate = new Date(ev.start.dateTime);
       const styled = styleFromEvent(ev);
       return {
+        id: ev.id || `${ev.start.dateTime}-${ev.summary || index}`,
         time: formatTimeInZone(startDate, timeZone),
         groups: groupsFromEvent(ev),
         ...styled,
@@ -336,8 +345,8 @@ function calendarEventsToSchedule(events, timeZone) {
 
 /* Returns index of current active (or next upcoming) event.
    Accounts for: natural time, half-time auto-advance, manual completions. */
-function findHeroIdx(now, completed, schedule) {
-  const ns = nowSec(now);
+function findHeroIdx(now, completed, schedule, timeZone) {
+  const ns = nowSec(now, timeZone);
 
   // Last event that has started (or 0 if none yet)
   let candidate = 0;
@@ -355,7 +364,7 @@ function findHeroIdx(now, completed, schedule) {
   }
 
   // Skip manually completed events
-  while (candidate < schedule.length - 1 && completed.has(candidate)) {
+  while (candidate < schedule.length - 1 && completed.has(schedule[candidate].id)) {
     candidate++;
   }
 
@@ -363,8 +372,8 @@ function findHeroIdx(now, completed, schedule) {
 }
 
 /* Returns diff in seconds: positive = upcoming, negative = elapsed since start */
-function countdownDiff(now, idx, schedule) {
-  return toSec(schedule[idx].time) - nowSec(now);
+function countdownDiff(now, idx, schedule, timeZone) {
+  return toSec(schedule[idx].time) - nowSec(now, timeZone);
 }
 
 function formatDiff(diff) {
@@ -465,9 +474,9 @@ const CheckItem = memo(function CheckItem({ emoji, label, checked, index, onTogg
 });
 
 /* ── HeroCard ── */
-function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTimer, schedule }) {
+function HeroCard({ now, heroIdx, checks, onToggle, onComplete, theme, debugTimer, schedule, timeZone }) {
   const ev      = schedule[heroIdx];
-  const diff    = countdownDiff(now, heroIdx, schedule);
+  const diff    = countdownDiff(now, heroIdx, schedule, timeZone);
   // debugTimer override: 'обратно' = force upcoming, 'изминало' = force started
   const effectiveDiff = debugTimer === 'обратно' && diff < 0 ? 60
     : debugTimer === 'изминало' && diff >= 0 ? -60
@@ -610,7 +619,7 @@ const EventList = memo(function EventList({ now, heroIdx, dark, schedule }) {
           const isPast    = i < heroIdx;
           const isCurrent = i === heroIdx;
           return (
-            <div key={`${ev.time}-${ev.name}`} style={{
+            <div key={ev.id} style={{
               background: rowBg, borderRadius:R.md, padding:`${S[3]}px ${S[3]}px`,
               display:'flex', alignItems:'center', gap:S[2],
               boxShadow: isCurrent
@@ -693,39 +702,35 @@ const EmptySchedule = memo(function EmptySchedule({ refreshDate, refreshing, onR
 });
 
 /* ── App ── */
-function ScheduleView({ now, schedule, refreshDate, refreshing, onRefresh, groups, selectedGroup, onSelectGroup, t, setTweak, eventOpts, debugIdx }) {
-  /* Per-event checklist state, keyed by event index */
+function ScheduleView({ now, schedule, timeZone, refreshDate, refreshing, onRefresh, groups, selectedGroup, onSelectGroup, t, setTweak, eventOpts, debugIdx }) {
+  /* Interaction state follows the calendar event, even when filtering reorders the list. */
   const [checkStates, setCheckStates] = useState({});
 
-  // Manual completions: set of event indices the child marked done
+  // Manual completions: stable calendar event IDs the child marked done
   const [completed, setCompleted] = useState(new Set());
 
-  useEffect(() => {
-    setCompleted(new Set());
-    setCheckStates({});
-  }, [schedule]);
-
-  const heroIdx = debugIdx >= 0 ? debugIdx : findHeroIdx(now, completed, schedule);
+  const heroIdx = debugIdx >= 0 ? debugIdx : findHeroIdx(now, completed, schedule, timeZone);
+  const heroId = schedule[heroIdx].id;
 
   const heroChecks = useMemo(() => {
     const base = schedule[heroIdx].checklist.map(item => ({ ...item, checked: false }));
-    const saved = checkStates[heroIdx] || [];
+    const saved = checkStates[heroId] || [];
     return base.map((item, i) => ({ ...item, checked: saved[i] ?? false }));
-  }, [heroIdx, checkStates, schedule]);
+  }, [heroIdx, heroId, checkStates, schedule]);
 
   const toggleCheck = useCallback(i => {
     setCheckStates(prev => {
-      const current = (prev[heroIdx] || schedule[heroIdx].checklist.map(() => false));
+      const current = (prev[heroId] || schedule[heroIdx].checklist.map(() => false));
       const next = [...current];
       next[i] = !next[i];
-      return { ...prev, [heroIdx]: next };
+      return { ...prev, [heroId]: next };
     });
-  }, [heroIdx, schedule]);
+  }, [heroIdx, heroId, schedule]);
 
   const handleComplete = useCallback(() => {
-    if (nowSec(new Date()) < toSec(schedule[heroIdx].time)) return;
-    setCompleted(prev => new Set([...prev, heroIdx]));
-  }, [heroIdx, schedule]);
+    if (nowSec(new Date(), timeZone) < toSec(schedule[heroIdx].time)) return;
+    setCompleted(prev => new Set([...prev, heroId]));
+  }, [heroIdx, heroId, schedule, timeZone]);
 
   /* Sync page + body bg and grid to current event */
   useEffect(() => {
@@ -753,7 +758,7 @@ function ScheduleView({ now, schedule, refreshDate, refreshing, onRefresh, group
         selectedGroup={selectedGroup} onSelectGroup={onSelectGroup} />
       <HeroCard now={now} heroIdx={heroIdx} checks={heroChecks}
                 onToggle={toggleCheck} onComplete={handleComplete}
-                theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} />
+                theme={t.accent} debugTimer={t.debugTimer} schedule={schedule} timeZone={timeZone} />
       <EventList now={now} heroIdx={heroIdx} dark={isDark} schedule={schedule} />
 
       <TweaksPanel>
@@ -777,11 +782,11 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const now = useNow();
   const [calendar, setCalendar] = useState(() => {
-    const cache = readCachedSchedule();
+    const schedule = readCachedSchedule();
     return {
-      cache,
-      status:cache?.schedule.length ? 'offline-cache' : 'loading',
-      message:cache?.schedule.length ? 'Показвам запазения график за днес, докато се обнови.' : '',
+      schedule,
+      status:schedule?.schedule.length ? 'offline-cache' : 'loading',
+      message:schedule?.schedule.length ? 'Показвам запазения график за днес, докато се обнови.' : '',
       refreshing:false,
     };
   });
@@ -791,23 +796,28 @@ function App() {
     catch (error) { return ''; }
   });
 
-  const loadCalendarSchedule = useCallback(async () => {
+  const loadCalendarSchedule = useCallback(async (date = todayDate()) => {
     requestRef.current.controller?.abort();
     const controller = new AbortController();
     const requestId = requestRef.current.id + 1;
     requestRef.current = { controller, id:requestId };
-    const requestedDate = todayDate();
+    const requestedDate = date;
     const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
     setCalendar(prev => ({
       ...prev,
-      status:prev.cache ? prev.status : 'loading',
-      message:prev.cache ? prev.message : '',
+      schedule:prev.schedule?.date === requestedDate ? prev.schedule : null,
+      status:prev.schedule?.date === requestedDate ? prev.status : 'loading',
+      message:prev.schedule?.date === requestedDate ? prev.message : '',
       refreshing:true,
     }));
 
     try {
-      const endpoint = `${CALENDAR_ENDPOINT}?date=${encodeURIComponent(requestedDate)}`;
+      const params = new URLSearchParams({
+        date:requestedDate,
+        timeZone:DEFAULT_CALENDAR_TIME_ZONE,
+      });
+      const endpoint = `${CALENDAR_ENDPOINT}?${params}`;
       const response = await fetch(endpoint, { signal: controller.signal, cache: 'no-store' });
       if (!response.ok) throw new Error(`Calendar request failed: ${response.status}`);
       const data = await response.json();
@@ -822,30 +832,31 @@ function App() {
       if (data.ok === true && data.date === requestedDate && requestedDate === todayDate()) {
         saveCachedSchedule(cache);
         setCalendar({
-          cache,
+          schedule:cache,
           status:mapped.length ? 'online' : 'empty',
           message:mapped.length ? '' : 'Няма събития за днес.',
           refreshing:false,
         });
       } else {
-        const currentCache = readCachedSchedule();
-        setCalendar({
-          cache:currentCache,
-          status:currentCache ? 'offline-cache' : 'empty',
+        setCalendar(prev => ({
+          schedule:prev.schedule?.date === requestedDate ? prev.schedule : null,
+          status:prev.schedule?.date === requestedDate ? 'offline-cache' : 'empty',
           message:data.message || 'Календарът не е настроен.',
           refreshing:false,
-        });
+        }));
       }
     } catch (error) {
       if (requestRef.current.id !== requestId) return;
-      const currentCache = readCachedSchedule();
-      setCalendar({
-        cache:currentCache,
-        status:currentCache ? 'offline-cache' : 'offline-empty',
-        message:currentCache
-          ? 'Показвам последно изтегления график за днес.'
-          : 'Няма запазен график за днешната дата.',
-        refreshing:false,
+      setCalendar(prev => {
+        const currentSchedule = prev.schedule?.date === requestedDate ? prev.schedule : null;
+        return {
+          schedule:currentSchedule,
+          status:currentSchedule ? 'offline-cache' : 'offline-empty',
+          message:currentSchedule
+            ? 'Показвам последно изтегления график за днес.'
+            : 'Няма запазен график за днешната дата.',
+          refreshing:false,
+        };
       });
       if (error.name !== 'AbortError') console.warn('Calendar schedule could not be loaded.', error);
     } finally {
@@ -853,33 +864,27 @@ function App() {
     }
   }, []);
 
+  const currentDate = todayDate(now);
+
   useEffect(() => {
-    loadCalendarSchedule();
+    loadCalendarSchedule(currentDate);
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') loadCalendarSchedule();
+      if (document.visibilityState === 'visible') loadCalendarSchedule(todayDate());
     };
-    window.addEventListener('pageshow', loadCalendarSchedule);
-    window.addEventListener('online', loadCalendarSchedule);
+    const refreshToday = () => loadCalendarSchedule(todayDate());
+    window.addEventListener('pageshow', refreshToday);
+    window.addEventListener('online', refreshToday);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
       requestRef.current.controller?.abort();
       requestRef.current.id += 1;
-      window.removeEventListener('pageshow', loadCalendarSchedule);
-      window.removeEventListener('online', loadCalendarSchedule);
+      window.removeEventListener('pageshow', refreshToday);
+      window.removeEventListener('online', refreshToday);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [loadCalendarSchedule]);
+  }, [currentDate, loadCalendarSchedule]);
 
-  const currentDate = todayDate(now);
-
-  useEffect(() => {
-    if (calendar.cache && calendar.cache.date !== currentDate) {
-      setCalendar({ cache:null, status:'loading', message:'', refreshing:true });
-      loadCalendarSchedule();
-    }
-  }, [currentDate, calendar.cache, loadCalendarSchedule]);
-
-  const currentSchedule = calendar.cache?.date === currentDate ? calendar.cache.schedule : [];
+  const currentSchedule = calendar.schedule?.date === currentDate ? calendar.schedule.schedule : [];
 
   const groups = useMemo(() => (
     [...new Set(currentSchedule.flatMap(eventGroups))]
@@ -924,8 +929,8 @@ function App() {
   if (currentSchedule.length === 0) {
     return (
       <>
-        <EmptySchedule refreshDate={calendar.cache?.date || ''} refreshing={calendar.refreshing}
-          onRefresh={loadCalendarSchedule} status={calendar.status} message={calendar.message} />
+        <EmptySchedule refreshDate={calendar.schedule?.date || ''} refreshing={calendar.refreshing}
+          onRefresh={() => loadCalendarSchedule(currentDate)} status={calendar.status} message={calendar.message} />
         <TweaksPanel>
           <TweakSection label="Акцент" />
           <TweakSelect label="Цвят" value={t.accent}
@@ -936,8 +941,9 @@ function App() {
     );
   }
 
-  return <ScheduleView now={now} schedule={visibleSchedule} refreshDate={calendar.cache.date}
-    refreshing={calendar.refreshing} onRefresh={loadCalendarSchedule} groups={groups}
+  return <ScheduleView now={now} schedule={visibleSchedule} timeZone={calendar.schedule.timeZone}
+    refreshDate={calendar.schedule.date} refreshing={calendar.refreshing}
+    onRefresh={() => loadCalendarSchedule(currentDate)} groups={groups}
     selectedGroup={activeGroup} onSelectGroup={selectGroup}
     t={t} setTweak={setTweak} eventOpts={eventOpts} debugIdx={debugIdx} />;
 }
