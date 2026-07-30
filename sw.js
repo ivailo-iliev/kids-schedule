@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'kids-schedule-v8';
+const CACHE_VERSION = 'kids-schedule-v9';
 const APP_SHELL = [
   '/',
   '/Schedule.html',
@@ -78,7 +78,7 @@ self.addEventListener('fetch', event => {
   }
 
   if (url.pathname === CALENDAR_PATH) {
-    event.respondWith(networkFirst(event.request, { cache: 'no-store' }));
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
 
